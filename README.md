@@ -37,6 +37,7 @@ A list of differences from `jni-bindgen` are listed in [`java-spaghetti`'s READM
   - [ ] Use absolute paths (`crate::...`)
   - [ ] "Correctly" format generated code
 - [ ] Use `ristretto_classfile` instead of `cafebabe`
+- [ ] Fix indeterminism in what JARs are read and when
 - [ ] Actually do documentation
 - [ ] Stub generation?
 
