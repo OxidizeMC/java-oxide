@@ -1,14 +1,14 @@
-#![macro_use]
-
+#[macro_export]
 macro_rules! io_data_error {
     ($($arg:tt)*) => {{
-        let message = format!($($arg)*);
+        let message: String = format!($($arg)*);
         std::io::Error::new(std::io::ErrorKind::InvalidData, message)
     }};
 }
 
+#[macro_export]
 macro_rules! io_data_err {
-    ($($arg:tt)*) => { Err(io_data_error!($($arg)*)) };
+    ($($arg:tt)*) => { Err($crate::io_data_error!($($arg)*)) };
 }
 
 mod difference;

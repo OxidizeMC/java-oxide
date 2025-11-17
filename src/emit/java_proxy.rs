@@ -1,28 +1,33 @@
-use std::fmt::Write;
-use std::path::Path;
-
-use cafebabe::descriptors::{FieldDescriptor, FieldType, ReturnDescriptor};
-
-use super::classes::Class;
-use super::methods::Method;
-use crate::emit::Context;
-use crate::util;
+use super::{classes::Class, methods::Method};
+use crate::{config::ClassConfig, emit::Context, util};
+use cafebabe::{
+    MethodInfo,
+    descriptors::{FieldDescriptor, FieldType, ReturnDescriptor},
+};
+use std::{fmt::Write, path::Path};
 
 impl Class {
     pub(crate) fn write_java_proxy(&self, context: &Context) -> anyhow::Result<String> {
         // Collect methods for this class
-        let methods: Vec<Method> = self.java.methods().map(|m| Method::new(&self.java, m)).collect();
+        let methods: Vec<Method> = self
+            .java
+            .methods()
+            .map(|m: &MethodInfo<'_>| Method::new(&self.java, m))
+            .collect();
 
-        let java_proxy_path = format!(
+        let java_proxy_path: String = format!(
             "{}/{}",
             context.config.proxy_package,
             self.java.path().as_str().replace("$", "_")
         );
 
-        let package_name = java_proxy_path.rsplit_once('/').map(|x| x.0).unwrap_or("");
-        let class_name = java_proxy_path.split('/').next_back().unwrap();
+        let package_name: &str = java_proxy_path
+            .rsplit_once('/')
+            .map(|x: (&str, &str)| x.0)
+            .unwrap_or("");
+        let class_name: &str = java_proxy_path.split('/').next_back().unwrap();
 
-        let mut w = String::new();
+        let mut w: String = String::new();
 
         // Package declaration
         if !package_name.is_empty() {
@@ -31,7 +36,7 @@ impl Class {
         }
 
         // Class declaration
-        let parent_type = if self.java.is_interface() {
+        let parent_type: &str = if self.java.is_interface() {
             "implements"
         } else {
             "extends"
@@ -67,7 +72,9 @@ impl Class {
 
         // Generate methods
         for method in methods {
-            let Some(_rust_name) = method.rust_name() else { continue };
+            let Some(_rust_name) = method.rust_name() else {
+                continue;
+            };
             if method.java.is_static()
                 || method.java.is_static_init()
                 || method.java.is_constructor()
@@ -77,17 +84,17 @@ impl Class {
                 continue;
             }
 
-            let method_name = method.java.name();
+            let method_name: &str = method.java.name();
 
             // Method signature
-            let return_type = match &method.java.descriptor.return_type {
+            let return_type: String = match &method.java.descriptor.return_type {
                 ReturnDescriptor::Void => "void".to_string(),
                 ReturnDescriptor::Return(desc) => java_type_name(desc)?,
             };
 
-            let mut params = Vec::new();
+            let mut params: Vec<String> = Vec::new();
             for (i, param) in method.java.descriptor.parameters.iter().enumerate() {
-                let param_type = java_type_name(param)?;
+                let param_type: String = java_type_name(param)?;
                 params.push(format!("{param_type} arg{i}"));
             }
 
@@ -101,8 +108,8 @@ impl Class {
             )?;
 
             // Method body - call native method
-            let native_method_name = format!("native_{method_name}");
-            let mut args = vec!["ptr".to_string()];
+            let native_method_name: String = format!("native_{method_name}");
+            let mut args: Vec<String> = vec!["ptr".to_string()];
             for i in 0..method.java.descriptor.parameters.len() {
                 args.push(format!("arg{i}"));
             }
@@ -110,14 +117,19 @@ impl Class {
             if return_type == "void" {
                 writeln!(w, "        {}({});", native_method_name, args.join(", "))?;
             } else {
-                writeln!(w, "        return {}({});", native_method_name, args.join(", "))?;
+                writeln!(
+                    w,
+                    "        return {}({});",
+                    native_method_name,
+                    args.join(", ")
+                )?;
             }
             writeln!(w, "    }}")?;
 
             // Native method declaration
-            let mut native_params = vec!["long ptr".to_string()];
+            let mut native_params: Vec<String> = vec!["long ptr".to_string()];
             for (i, param) in method.java.descriptor.parameters.iter().enumerate() {
-                let param_type = java_type_name(param)?;
+                let param_type: String = java_type_name(param)?;
                 native_params.push(format!("{param_type} arg{i}"));
             }
 
@@ -138,9 +150,9 @@ impl Class {
 }
 
 fn java_type_name(desc: &FieldDescriptor) -> anyhow::Result<String> {
-    let mut result = String::new();
+    let mut result: String = String::new();
 
-    let base_type = match &desc.field_type {
+    let base_type: &str = match &desc.field_type {
         FieldType::Byte => "byte",
         FieldType::Char => "char",
         FieldType::Double => "double",
@@ -171,18 +183,18 @@ fn java_type_name(desc: &FieldDescriptor) -> anyhow::Result<String> {
 
 pub fn write_java_proxy_files(context: &Context, output_dir: &Path) -> anyhow::Result<()> {
     for (_, class) in context.all_classes.iter() {
-        let cc = context.config.resolve_class(class.java.path().as_str());
+        let cc: ClassConfig<'_> = context.config.resolve_class(class.java.path().as_str());
         if !cc.proxy {
             continue;
         }
 
-        let java_code = class.write_java_proxy(context)?;
+        let java_code: String = class.write_java_proxy(context)?;
 
         // Calculate output file path
-        let java_proxy_path = class.java.path().as_str().replace("$", "_");
+        let java_proxy_path: String = class.java.path().as_str().replace("$", "_");
 
-        let relative_path = format!("{java_proxy_path}.java");
-        let output_file = output_dir.join(&relative_path);
+        let relative_path: String = format!("{java_proxy_path}.java");
+        let output_file: std::path::PathBuf = output_dir.join(&relative_path);
 
         // Write Java file
         util::write_generated(context, &output_file, java_code.as_bytes())?;

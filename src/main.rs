@@ -1,31 +1,30 @@
 // this must go first because of macros.
-mod util;
-
 mod config;
 mod emit;
 mod identifiers;
 mod parser_util;
+mod util;
 
-use std::fs::File;
-use std::io::{self, Read};
-use std::path::{Path, PathBuf};
-
+use crate::{config::Config, parser_util::JavaClass};
 use clap::{Parser, Subcommand};
-
-use crate::config::Config;
-use crate::parser_util::JavaClass;
+use std::{
+    fs::File,
+    io::{self, BufReader, Read},
+    path::{Path, PathBuf},
+};
+use zip::{ZipArchive, read::ZipFile};
 
 /// The core function of this library: Generate Rust code to access Java APIs.
 pub fn run(config: impl Into<Config>) -> Result<(), anyhow::Error> {
     let config: Config = config.into();
     println!("output: {}", config.output.display());
 
-    let mut context = emit::Context::new(&config);
+    let mut context: emit::Context<'_> = emit::Context::new(&config);
     for file in config.input.iter() {
         gather_file(&mut context, file)?;
     }
 
-    let mut out = Vec::with_capacity(4096);
+    let mut out: Vec<u8> = Vec::with_capacity(4096);
     context.write(&mut out)?;
     util::write_generated(&context, &config.output, &out[..])?;
 
@@ -38,7 +37,7 @@ pub fn run(config: impl Into<Config>) -> Result<(), anyhow::Error> {
 }
 
 fn gather_file(context: &mut emit::Context, path: &Path) -> Result<(), anyhow::Error> {
-    let verbose = context.config.logging_verbose;
+    let verbose: bool = context.config.logging_verbose;
 
     context
         .progress
@@ -46,7 +45,7 @@ fn gather_file(context: &mut emit::Context, path: &Path) -> Result<(), anyhow::E
         .unwrap()
         .update(format!("reading {}...", path.display()).as_str());
 
-    let ext = if let Some(ext) = path.extension() {
+    let ext: &std::ffi::OsStr = if let Some(ext) = path.extension() {
         ext
     } else {
         return Err(io::Error::new(
@@ -57,15 +56,16 @@ fn gather_file(context: &mut emit::Context, path: &Path) -> Result<(), anyhow::E
 
     match ext.to_string_lossy().to_ascii_lowercase().as_str() {
         "class" => {
-            let class = JavaClass::read(std::fs::read(path)?)?;
+            let class: JavaClass = JavaClass::read(std::fs::read(path)?)?;
             context.add_class(class)?;
         }
         "jar" => {
-            let mut jar = zip::ZipArchive::new(io::BufReader::new(File::open(path)?))?;
-            let n = jar.len();
+            let mut jar: ZipArchive<BufReader<File>> =
+                ZipArchive::new(BufReader::new(File::open(path)?))?;
+            let n: usize = jar.len();
 
             for i in 0..n {
-                let mut file = jar.by_index(i)?;
+                let mut file: ZipFile<'_, BufReader<File>> = jar.by_index(i)?;
                 if !file.name().ends_with(".class") {
                     continue;
                 }
@@ -78,16 +78,19 @@ fn gather_file(context: &mut emit::Context, path: &Path) -> Result<(), anyhow::E
                         .update(format!("  reading {:3}/{}: {}...", i, n, file.name()).as_str());
                 }
 
-                let mut buf = Vec::new();
+                let mut buf: Vec<u8> = Vec::new();
                 file.read_to_end(&mut buf)?;
-                let class = JavaClass::read(buf)?;
+                let class: JavaClass = JavaClass::read(buf)?;
                 context.add_class(class)?;
             }
         }
         unknown => {
             Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Input files must have a '.class' or '.jar' extension, not a '.{unknown}' extension",),
+                format!(
+                    "Input files must have a '.class' or '.jar' extension, not a '.{}' extension",
+                    unknown
+                ),
             ))?;
         }
     }
@@ -102,9 +105,9 @@ struct Cli {
     cmd: Cmd,
 }
 
-/// Doc comment
 #[derive(Subcommand, Debug)]
 enum Cmd {
+    /// Generate Java Bindings
     Generate(GenerateCmd),
 }
 
@@ -120,15 +123,13 @@ struct GenerateCmd {
 }
 
 pub fn main() {
-    let cli = Cli::parse();
+    let cli: Cli = Cli::parse();
 
     match cli.cmd {
         Cmd::Generate(cmd) => {
-            let mut config = if let Some(config_path) = cmd.config {
-                // Use specified config file
+            let mut config: Config = if let Some(config_path) = cmd.config {
                 config::Config::from_file(&config_path).unwrap()
             } else {
-                // Search from current working directory
                 config::Config::from_current_directory().unwrap()
             };
 

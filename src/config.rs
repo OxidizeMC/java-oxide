@@ -1,9 +1,13 @@
 //! java-oxide.yaml configuration file structures and parsing APIs.
 
-use std::path::{Path, PathBuf};
-use std::{fs, io};
-
 use serde_derive::Deserialize;
+use std::{
+    fs::File,
+    io,
+    iter::Peekable,
+    path::{Path, PathBuf},
+    str::Chars,
+};
 
 fn default_proxy_package() -> String {
     "java_oxide/proxy".to_string()
@@ -104,7 +108,7 @@ impl Default for ClassMatch {
 }
 impl ClassMatch {
     fn matches(&self, class: &str) -> bool {
-        let options = glob::MatchOptions {
+        let options: glob::MatchOptions = glob::MatchOptions {
             case_sensitive: true,
             require_literal_separator: true,
             require_literal_leading_dot: false,
@@ -112,11 +116,17 @@ impl ClassMatch {
 
         match self {
             Self::One(p) => {
-                let pattern = glob::Pattern::new(p).unwrap_or_else(|e| panic!("Invalid glob pattern '{p}': {e}"));
+                let pattern: glob::Pattern =
+                    glob::Pattern::new(p).unwrap_or_else(|e: glob::PatternError| {
+                        panic!("Invalid glob pattern '{p}': {e}")
+                    });
                 pattern.matches_with(class, options)
             }
-            Self::Many(pp) => pp.iter().any(|p| {
-                let pattern = glob::Pattern::new(p).unwrap_or_else(|e| panic!("Invalid glob pattern '{p}': {e}"));
+            Self::Many(pp) => pp.iter().any(|p: &String| -> bool {
+                let pattern: glob::Pattern =
+                    glob::Pattern::new(p).unwrap_or_else(|e: glob::PatternError| {
+                        panic!("Invalid glob pattern '{p}': {e}")
+                    });
                 pattern.matches_with(class, options)
             }),
         }
@@ -189,7 +199,7 @@ impl Config {
     /// Read from I/O, under the assumption that it's in the "java-oxide.yaml" file format.
     /// `directory` is the directory that contained the `java-oxide.yaml` file, against which paths should be resolved.
     pub fn read(file: &mut impl io::Read, dir: &Path) -> io::Result<Self> {
-        let mut buffer = String::new();
+        let mut buffer: String = String::new();
         file.read_to_string(&mut buffer)?; // Apparently yaml can't stream.
         Self::read_str(&buffer[..], dir)
     }
@@ -197,8 +207,8 @@ impl Config {
     /// Read from a memory buffer, under the assumption that it's in the "java-oxide.yaml" file format.
     /// `directory` is the directory that contained the `java-oxide.yaml` file, against which paths should be resolved.
     pub fn read_str(buffer: &str, dir: &Path) -> io::Result<Self> {
-        let mut config: Config =
-            serde_yaml::from_str(buffer).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+        let mut config: Config = serde_yaml::from_str(buffer)
+            .map_err(|e: serde_yaml::Error| io::Error::new(io::ErrorKind::InvalidData, e))?;
 
         if config.rules.is_empty() {
             config.rules.push(Rule {
@@ -229,13 +239,12 @@ impl Config {
     /// Search the specified directory - or failing that, it's ancestors - until we find "java-oxide.yaml" or reach the
     /// root of the filesystem and cannot continue.
     pub fn from_directory(path: &Path) -> io::Result<Self> {
-        let original = path;
-        let mut path = path.to_owned();
+        let original: &Path = path;
+        let mut path: PathBuf = path.to_owned();
         loop {
             path.push("java-oxide.yaml");
-            println!("cargo:rerun-if-changed={}", path.display());
             if path.exists() {
-                return Config::read(&mut fs::File::open(&path)?, path.parent().unwrap());
+                return Config::read(&mut File::open(&path)?, path.parent().unwrap());
             }
             if !path.pop() || !path.pop() {
                 Err(io::Error::new(
@@ -251,13 +260,13 @@ impl Config {
 
     /// Read configuration from a specific file path.
     pub fn from_file(path: &Path) -> io::Result<Self> {
-        let mut file = fs::File::open(path)?;
-        let config_dir = path.parent().unwrap_or(Path::new("."));
+        let mut file: File = File::open(path)?;
+        let config_dir: &Path = path.parent().unwrap_or(Path::new("."));
         Self::read(&mut file, config_dir)
     }
 
     pub fn resolve_class(&self, class: &str) -> ClassConfig<'_> {
-        let mut res = ClassConfig {
+        let mut res: ClassConfig<'_> = ClassConfig {
             include: false,
             include_private_classes: false,
             include_private_methods: false,
@@ -294,14 +303,18 @@ impl Config {
 }
 
 fn resolve_file(path: &Path, dir: &Path) -> PathBuf {
-    let path = expand_vars(&path.to_string_lossy());
+    let path: String = expand_vars(&path.to_string_lossy());
     let path: PathBuf = path.into();
-    if path.is_relative() { dir.join(path) } else { path }
+    if path.is_relative() {
+        dir.join(path)
+    } else {
+        path
+    }
 }
 
 fn expand_vars(string: &str) -> String {
-    let mut result = String::new();
-    let mut chars = string.chars().peekable();
+    let mut result: String = String::new();
+    let mut chars: Peekable<Chars<'_>> = string.chars().peekable();
 
     while let Some(ch) = chars.next() {
         if ch == '$' {
@@ -309,8 +322,8 @@ fn expand_vars(string: &str) -> String {
                 if next_ch == '{' {
                     // ${VAR} format
                     chars.next(); // consume '{'
-                    let mut var_name = String::new();
-                    let mut found_close = false;
+                    let mut var_name: String = String::new();
+                    let mut found_close: bool = false;
 
                     for var_ch in chars.by_ref() {
                         if var_ch == '}' {
@@ -338,7 +351,7 @@ fn expand_vars(string: &str) -> String {
                     }
                 } else if next_ch.is_ascii_alphabetic() || next_ch == '_' {
                     // $VAR format (alphanumeric and underscore)
-                    let mut var_name = String::new();
+                    let mut var_name: String = String::new();
 
                     while let Some(&var_ch) = chars.peek() {
                         if var_ch.is_ascii_alphanumeric() || var_ch == '_' {
@@ -383,13 +396,19 @@ mod tests {
         // Test ${VAR} format
         unsafe { std::env::set_var("TEST_VAR", "hello") };
         assert_eq!(expand_vars("${TEST_VAR}"), "hello");
-        assert_eq!(expand_vars("prefix_${TEST_VAR}_suffix"), "prefix_hello_suffix");
+        assert_eq!(
+            expand_vars("prefix_${TEST_VAR}_suffix"),
+            "prefix_hello_suffix"
+        );
 
         // Test $VAR format
         assert_eq!(expand_vars("$TEST_VAR"), "hello");
         // Note: In shell, $VAR_suffix would try to expand VAR_suffix, not VAR + _suffix
         // This is correct behavior - use ${VAR}_suffix for the latter
-        assert_eq!(expand_vars("prefix_${TEST_VAR}/suffix"), "prefix_hello/suffix");
+        assert_eq!(
+            expand_vars("prefix_${TEST_VAR}/suffix"),
+            "prefix_hello/suffix"
+        );
 
         // Test literal $ characters
         assert_eq!(expand_vars("$"), "$");
@@ -419,25 +438,28 @@ mod tests {
     #[test]
     fn test_class_match_glob_patterns() {
         // Test exact match
-        let match_exact = ClassMatch::One("com/example/MyClass".to_string());
+        let match_exact: ClassMatch = ClassMatch::One("com/example/MyClass".to_string());
         assert!(match_exact.matches("com/example/MyClass"));
         assert!(!match_exact.matches("com/example/MyOtherClass"));
 
         // Test wildcard patterns
-        let match_wildcard = ClassMatch::One("com/example/*".to_string());
+        let match_wildcard: ClassMatch = ClassMatch::One("com/example/*".to_string());
         assert!(match_wildcard.matches("com/example/MyClass"));
         assert!(match_wildcard.matches("com/example/MyOtherClass"));
         assert!(!match_wildcard.matches("com/other/MyClass"));
 
         // Test question mark pattern
-        let match_question = ClassMatch::One("com/example/MyClass?".to_string());
+        let match_question: ClassMatch = ClassMatch::One("com/example/MyClass?".to_string());
         assert!(match_question.matches("com/example/MyClass1"));
         assert!(match_question.matches("com/example/MyClassA"));
         assert!(!match_question.matches("com/example/MyClass"));
         assert!(!match_question.matches("com/example/MyClass12"));
 
         // Test multiple patterns
-        let match_many = ClassMatch::Many(vec!["com/example/*".to_string(), "org/test/specific/Class".to_string()]);
+        let match_many: ClassMatch = ClassMatch::Many(vec![
+            "com/example/*".to_string(),
+            "org/test/specific/Class".to_string(),
+        ]);
         assert!(match_many.matches("com/example/MyClass"));
         assert!(match_many.matches("org/test/specific/Class"));
         assert!(!match_many.matches("org/other/MyClass"));
@@ -446,25 +468,25 @@ mod tests {
     #[test]
     #[should_panic(expected = "Invalid glob pattern")]
     fn test_class_match_invalid_pattern_panics() {
-        let match_invalid = ClassMatch::One("[invalid".to_string());
+        let match_invalid: ClassMatch = ClassMatch::One("[invalid".to_string());
         match_invalid.matches("any_class");
     }
     #[test]
     fn test_class_match_literal_separator() {
         // Test that require_literal_separator: true prevents * from matching /
-        let match_pattern = ClassMatch::One("com/example*".to_string());
+        let match_pattern: ClassMatch = ClassMatch::One("com/example*".to_string());
         assert!(match_pattern.matches("com/example"));
         assert!(match_pattern.matches("com/exampleClass"));
         assert!(!match_pattern.matches("com/example/SubClass")); // * should not match /
 
         // Test that we can use ** to match across directories
-        let match_recursive = ClassMatch::One("com/**/MyClass".to_string());
+        let match_recursive: ClassMatch = ClassMatch::One("com/**/MyClass".to_string());
         assert!(match_recursive.matches("com/example/MyClass"));
         assert!(match_recursive.matches("com/deep/nested/path/MyClass"));
         assert!(match_recursive.matches("com/MyClass")); // ** can match zero directories too
 
         // Test that * within a directory works
-        let match_single_dir = ClassMatch::One("com/*/MyClass".to_string());
+        let match_single_dir: ClassMatch = ClassMatch::One("com/*/MyClass".to_string());
         assert!(match_single_dir.matches("com/example/MyClass"));
         assert!(!match_single_dir.matches("com/deep/nested/MyClass")); // single * doesn't cross /
     }

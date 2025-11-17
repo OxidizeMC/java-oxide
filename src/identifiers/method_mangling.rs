@@ -1,9 +1,8 @@
+use super::rust_identifier::rust_ident;
+use crate::parser_util::{Id, IdPart};
 use anyhow::bail;
 use cafebabe::descriptors::{FieldType, MethodDescriptor};
 use serde_derive::Deserialize;
-
-use super::rust_identifier::rust_ident;
-use crate::parser_util::{Id, IdPart};
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
@@ -44,16 +43,15 @@ pub enum MethodManglingStyle {
 
 #[test]
 fn method_mangling_style_mangle_test() {
+    use cafebabe::descriptors::{ClassName, FieldDescriptor, ReturnDescriptor};
     use std::borrow::Cow;
 
-    use cafebabe::descriptors::{ClassName, FieldDescriptor, ReturnDescriptor};
-
-    let desc_no_arg_ret_v = MethodDescriptor {
+    let desc_no_arg_ret_v: MethodDescriptor<'_> = MethodDescriptor {
         parameters: Vec::new(),
         return_type: ReturnDescriptor::Void,
     };
 
-    let desc_arg_i_ret_v = MethodDescriptor {
+    let desc_arg_i_ret_v: MethodDescriptor<'_> = MethodDescriptor {
         parameters: vec![FieldDescriptor {
             dimensions: 0,
             field_type: FieldType::Integer,
@@ -61,17 +59,25 @@ fn method_mangling_style_mangle_test() {
         return_type: ReturnDescriptor::Void,
     };
 
-    let desc_arg_obj_ret_v = MethodDescriptor {
+    let desc_arg_obj_ret_v: MethodDescriptor<'_> = MethodDescriptor {
         parameters: vec![FieldDescriptor {
             dimensions: 0,
-            field_type: FieldType::Object(ClassName::try_from(Cow::Borrowed("java/lang/Object")).unwrap()),
+            field_type: FieldType::Object(
+                ClassName::try_from(Cow::Borrowed("java/lang/Object")).unwrap(),
+            ),
         }],
         return_type: ReturnDescriptor::Void,
     };
 
     for &(name, sig, java, java_short, java_long) in &[
         ("getFoo", &desc_no_arg_ret_v, "getFoo", "getFoo", "getFoo"),
-        ("getFoo", &desc_arg_i_ret_v, "getFoo", "getFoo_int", "getFoo_int"),
+        (
+            "getFoo",
+            &desc_arg_i_ret_v,
+            "getFoo",
+            "getFoo_int",
+            "getFoo_int",
+        ),
         (
             "getFoo",
             &desc_arg_obj_ret_v,
@@ -93,11 +99,15 @@ fn method_mangling_style_mangle_test() {
     ] {
         assert_eq!(MethodManglingStyle::Java.mangle(name, sig).unwrap(), java);
         assert_eq!(
-            MethodManglingStyle::JavaShortSignature.mangle(name, sig).unwrap(),
+            MethodManglingStyle::JavaShortSignature
+                .mangle(name, sig)
+                .unwrap(),
             java_short
         );
         assert_eq!(
-            MethodManglingStyle::JavaLongSignature.mangle(name, sig).unwrap(),
+            MethodManglingStyle::JavaLongSignature
+                .mangle(name, sig)
+                .unwrap(),
             java_long
         );
     }
@@ -107,25 +117,36 @@ fn method_mangling_style_mangle_test() {
 fn mangle_method_name_test() {
     use cafebabe::descriptors::{MethodDescriptor, ReturnDescriptor};
 
-    let desc = MethodDescriptor {
+    let desc: MethodDescriptor<'_> = MethodDescriptor {
         parameters: Vec::new(),
         return_type: ReturnDescriptor::Void,
     };
 
-    assert_eq!(MethodManglingStyle::Java.mangle("isFooBar", &desc).unwrap(), "isFooBar");
     assert_eq!(
-        MethodManglingStyle::Java.mangle("XMLHttpRequest", &desc).unwrap(),
+        MethodManglingStyle::Java.mangle("isFooBar", &desc).unwrap(),
+        "isFooBar"
+    );
+    assert_eq!(
+        MethodManglingStyle::Java
+            .mangle("XMLHttpRequest", &desc)
+            .unwrap(),
         "XMLHttpRequest"
     );
     assert_eq!(
-        MethodManglingStyle::Java.mangle("getFieldID_Input", &desc).unwrap(),
+        MethodManglingStyle::Java
+            .mangle("getFieldID_Input", &desc)
+            .unwrap(),
         "getFieldID_Input"
     );
 }
 
 impl MethodManglingStyle {
-    pub fn mangle(&self, name: &str, descriptor: &MethodDescriptor) -> Result<String, anyhow::Error> {
-        let name = match name {
+    pub fn mangle(
+        &self,
+        name: &str,
+        descriptor: &MethodDescriptor,
+    ) -> Result<String, anyhow::Error> {
+        let name: &str = match name {
             "" => {
                 bail!("empty string")
             }
@@ -136,13 +157,13 @@ impl MethodManglingStyle {
             name => name,
         };
 
-        let long_sig = match self {
+        let long_sig: bool = match self {
             MethodManglingStyle::Java => return rust_ident(name),
             MethodManglingStyle::JavaShortSignature => false,
             MethodManglingStyle::JavaLongSignature => true,
         };
 
-        let mut buffer = name.to_string();
+        let mut buffer: String = name.to_string();
 
         for arg in descriptor.parameters.iter() {
             match &arg.field_type {
@@ -155,7 +176,7 @@ impl MethodManglingStyle {
                 FieldType::Float => buffer.push_str("_float"),
                 FieldType::Double => buffer.push_str("_double"),
                 FieldType::Object(class_name) => {
-                    let class = Id::from(class_name);
+                    let class: Id<'_> = Id::from(class_name);
 
                     if long_sig {
                         for component in class.iter() {

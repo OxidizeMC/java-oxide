@@ -19,16 +19,15 @@ impl Difference {
         original.seek(SeekFrom::Start(0))?;
         rewrite.seek(SeekFrom::Start(0))?;
 
-        let mut original_line = String::new();
-        let mut rewrite_line = String::new();
+        let mut original_line: String = String::new();
+        let mut rewrite_line: String = String::new();
 
-        let mut line_no = 0;
+        let mut line_no: u32 = 0;
         loop {
             line_no += 1;
 
-            let a = read_line_no_eol(original, &mut original_line)?;
-            let b = read_line_no_eol(rewrite, &mut rewrite_line)?;
-
+            let a: usize = read_line_no_eol(original, &mut original_line)?;
+            let b: usize = read_line_no_eol(rewrite, &mut rewrite_line)?;
             if a == 0 && b == 0 {
                 return Ok(None);
             }
@@ -47,7 +46,8 @@ impl Difference {
 }
 
 fn read_line_no_eol(reader: &mut impl BufRead, buffer: &mut String) -> io::Result<usize> {
-    let size = reader.read_line(buffer)?;
+    let size: usize = reader.read_line(buffer)?;
+    // FIXME: Use `buffer = buffer.trim_end().to_string()` instead?
     while buffer.ends_with('\r') || buffer.ends_with('\n') {
         buffer.pop();
     }

@@ -38,7 +38,7 @@ fn is_rust_ident(s: &str) -> bool {
     // https://doc.rust-lang.org/reference/identifiers.html
     !s.is_empty()
         && s != "_"
-        && s.chars().enumerate().all(|(i, ch)| {
+        && s.chars().enumerate().all(|(i, ch)| -> bool {
             if i == 0 {
                 ch.is_ascii_alphabetic() || ch == '_'
             } else {

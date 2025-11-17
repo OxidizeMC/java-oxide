@@ -1,15 +1,17 @@
+use super::{cstring, known_docs_url::KnownDocsUrl};
+use crate::{
+    config::ClassConfig,
+    emit::Context,
+    identifiers::{FieldMangling, mangle_field},
+    parser_util::{Id, JavaClass, JavaField},
+};
 use anyhow::anyhow;
-use cafebabe::constant_pool::LiteralConstant;
-use cafebabe::descriptors::{FieldDescriptor, FieldType};
-use proc_macro2::{Literal, TokenStream};
+use cafebabe::{
+    constant_pool::LiteralConstant,
+    descriptors::{FieldDescriptor, FieldType},
+};
+use proc_macro2::{Ident, Literal, TokenStream};
 use quote::{format_ident, quote};
-
-use super::cstring;
-use super::known_docs_url::KnownDocsUrl;
-use crate::config::ClassConfig;
-use crate::emit::Context;
-use crate::identifiers::{FieldMangling, mangle_field};
-use crate::parser_util::{Id, JavaClass, JavaField};
 
 pub struct Field<'a> {
     pub class: &'a JavaClass,
@@ -26,19 +28,24 @@ impl<'a> Field<'a> {
         }
     }
 
-    pub fn emit(&self, context: &Context, cc: &ClassConfig, mod_: &str) -> anyhow::Result<TokenStream> {
-        let mut emit_reject_reasons = Vec::new();
+    pub fn emit(
+        &self,
+        context: &Context,
+        cc: &ClassConfig,
+        mod_: &str,
+    ) -> anyhow::Result<TokenStream> {
+        let mut emit_reject_reasons: Vec<&'static str> = Vec::new();
 
-        let descriptor = &self.java.descriptor();
+        let descriptor: &&FieldDescriptor<'_> = &self.java.descriptor();
 
-        let rust_set_type = emit_type(
+        let rust_set_type: TokenStream = emit_type(
             descriptor,
             context,
             mod_,
             RustTypeFlavor::ImplAsArg,
             &mut emit_reject_reasons,
         )?;
-        let rust_get_type = emit_type(
+        let rust_get_type: TokenStream = emit_type(
             descriptor,
             context,
             mod_,
@@ -46,48 +53,53 @@ impl<'a> Field<'a> {
             &mut emit_reject_reasons,
         )?;
 
-        let static_fragment = match self.java.is_static() {
+        let static_fragment: &str = match self.java.is_static() {
             false => "",
             true => "_static",
         };
-        let field_fragment = emit_fragment_type(descriptor);
+        let field_fragment: &str = emit_fragment_type(descriptor);
 
         if self.rust_names.is_err() {
             emit_reject_reasons.push(match self.java.name() {
                 "$VALUES" => "Failed to mangle field name: enum $VALUES", // Expected
-                s if s.starts_with("this$") => "Failed to mangle field name: this$N outer class pointer", // Expected
+                s if s.starts_with("this$") => {
+                    "Failed to mangle field name: this$N outer class pointer"
+                } // Expected
                 _ => "ERROR:  Failed to mangle field name(s)",
             });
         }
 
         if !emit_reject_reasons.is_empty() {
-            // TODO log
             return Ok(TokenStream::new());
         }
 
-        let keywords = format!(
+        let keywords: String = format!(
             "{}{}{}{}",
             self.java.access().unwrap_or("???"),
             if self.java.is_static() { " static" } else { "" },
             if self.java.is_final() { " final" } else { "" },
-            if self.java.is_volatile() { " volatile" } else { "" }
+            if self.java.is_volatile() {
+                " volatile"
+            } else {
+                ""
+            }
         );
 
-        let attributes = if self.java.deprecated() {
+        let attributes: TokenStream = if self.java.deprecated() {
             quote!(#[deprecated])
         } else {
             quote!()
         };
 
-        let mut out = TokenStream::new();
+        let mut out: TokenStream = TokenStream::new();
 
-        let env_param = if self.java.is_static() {
+        let env_param: TokenStream = if self.java.is_static() {
             quote!(__jni_env: ::java_spaghetti::Env<'env>)
         } else {
             quote!(self: &::java_spaghetti::Ref<'env, Self>)
         };
 
-        let docs = match KnownDocsUrl::from_field(
+        let docs: String = match KnownDocsUrl::from_field(
             cc,
             self.class.path().as_str(),
             self.java.name(),
@@ -97,11 +109,15 @@ impl<'a> Field<'a> {
             None => format!("{keywords} {}", self.java.name()),
         };
 
-        match self.rust_names.as_ref().map_err(|e| anyhow!("bad mangling: {e}"))? {
+        match self
+            .rust_names
+            .as_ref()
+            .map_err(|e: &anyhow::Error| anyhow!("bad mangling: {e}"))?
+        {
             FieldMangling::ConstValue(constant, value) => {
-                let constant = format_ident!("{}", constant);
-                let value = emit_constant(value, descriptor);
-                let ty = if descriptor.dimensions == 0
+                let constant: Ident = format_ident!("{}", constant);
+                let value: TokenStream = emit_constant(value, descriptor);
+                let ty: TokenStream = if descriptor.dimensions == 0
                     && let FieldType::Object(cls) = &descriptor.field_type
                     && Id::from(cls).is_string_class()
                 {
@@ -117,27 +133,27 @@ impl<'a> Field<'a> {
                 ));
             }
             FieldMangling::GetSet(get, set) => {
-                let get = format_ident!("{get}");
-                let set = format_ident!("{set}");
+                let get: Ident = format_ident!("{get}");
+                let set: Ident = format_ident!("{set}");
 
-                let env_let = match self.java.is_static() {
+                let env_let: TokenStream = match self.java.is_static() {
                     false => quote!(let __jni_env = self.env();),
                     true => quote!(),
                 };
-                let require_field = format_ident!("require{static_fragment}_field");
-                let get_field = format_ident!("get{static_fragment}_{field_fragment}_field");
-                let set_field = format_ident!("set{static_fragment}_{field_fragment}_field");
+                let require_field: Ident = format_ident!("require{static_fragment}_field");
+                let get_field: Ident = format_ident!("get{static_fragment}_{field_fragment}_field");
+                let set_field: Ident = format_ident!("set{static_fragment}_{field_fragment}_field");
 
-                let this_or_class = match self.java.is_static() {
+                let this_or_class: TokenStream = match self.java.is_static() {
                     false => quote!(self.as_raw()),
                     true => quote!(__jni_class),
                 };
 
-                let java_name = cstring(self.java.name());
-                let descriptor = cstring(&self.java.descriptor().to_string());
+                let java_name: Literal = cstring(self.java.name());
+                let descriptor: Literal = cstring(&self.java.descriptor().to_string());
 
-                let get_docs = format!("**get** {docs}");
-                let set_docs = format!("**set** {docs}");
+                let get_docs: String = format!("**get** {docs}");
+                let set_docs: String = format!("**set** {docs}");
                 out.extend(quote!(
                     #[doc = #get_docs]
                     #attributes
@@ -154,7 +170,7 @@ impl<'a> Field<'a> {
 
                 // Setter
                 if !self.java.is_final() {
-                    let lifetimes = if field_fragment == "object" {
+                    let lifetimes: TokenStream = if field_fragment == "object" {
                         quote!('env, 'obj)
                     } else {
                         quote!('env)
@@ -185,7 +201,7 @@ pub fn emit_constant(constant: &LiteralConstant<'_>, descriptor: &FieldDescripto
     if descriptor.field_type == FieldType::Char && descriptor.dimensions == 0 {
         return match constant {
             LiteralConstant::Integer(value) => {
-                let value = *value as u16;
+                let value: u16 = *value as u16;
                 quote!(#value)
             }
             _ => panic!("invalid constant for char {constant:?}"),
@@ -201,11 +217,11 @@ pub fn emit_constant(constant: &LiteralConstant<'_>, descriptor: &FieldDescripto
 
     match constant {
         LiteralConstant::Integer(value) => {
-            let value = Literal::i32_unsuffixed(*value);
+            let value: Literal = Literal::i32_unsuffixed(*value);
             quote!(#value)
         }
         LiteralConstant::Long(value) => {
-            let value = Literal::i64_unsuffixed(*value);
+            let value: Literal = Literal::i64_unsuffixed(*value);
             quote!(#value)
         }
 
@@ -225,7 +241,9 @@ pub fn emit_constant(constant: &LiteralConstant<'_>, descriptor: &FieldDescripto
 
         LiteralConstant::String(value) => quote! {#value},
         LiteralConstant::StringBytes(_) => {
-            quote!(panic!("Java string constant contains invalid 'Modified UTF8'"))
+            quote!(panic!(
+                "Java string constant contains invalid 'Modified UTF8'"
+            ))
         }
     }
 }
@@ -241,8 +259,12 @@ pub enum RustTypeFlavor {
 fn flavorify(ty: TokenStream, flavor: RustTypeFlavor) -> TokenStream {
     match flavor {
         RustTypeFlavor::ImplAsArg => quote!(impl ::java_spaghetti::AsArg<#ty>),
-        RustTypeFlavor::OptionLocal => quote!(::std::option::Option<::java_spaghetti::Local<'env, #ty>>),
-        RustTypeFlavor::OptionRef => quote!(::std::option::Option<::java_spaghetti::Ref<'env, #ty>>),
+        RustTypeFlavor::OptionLocal => {
+            quote!(::std::option::Option<::java_spaghetti::Local<'env, #ty>>)
+        }
+        RustTypeFlavor::OptionRef => {
+            quote!(::std::option::Option<::java_spaghetti::Ref<'env, #ty>>)
+        }
         RustTypeFlavor::Arg => quote!(::java_spaghetti::Arg<#ty>),
         RustTypeFlavor::Return => quote!(::java_spaghetti::Return<'env, #ty>),
     }
@@ -256,7 +278,7 @@ pub fn emit_type(
     flavor: RustTypeFlavor,
     reject_reasons: &mut Vec<&'static str>,
 ) -> Result<TokenStream, std::fmt::Error> {
-    let res = if descriptor.dimensions == 0 {
+    let res: TokenStream = if descriptor.dimensions == 0 {
         match &descriptor.field_type {
             FieldType::Boolean => quote!(bool),
             FieldType::Byte => quote!(i8),
@@ -267,23 +289,24 @@ pub fn emit_type(
             FieldType::Float => quote!(f32),
             FieldType::Double => quote!(f64),
             FieldType::Object(class_name) => {
-                let class = Id::from(class_name);
+                let class: Id<'_> = Id::from(class_name);
                 if !context.all_classes.contains_key(class.as_str()) {
                     reject_reasons.push("ERROR:  missing class for field/argument type");
                 }
                 if let Ok(path) = context.java_to_rust_path(class, mod_) {
                     flavorify(path, flavor)
                 } else {
-                    reject_reasons.push("ERROR:  Failed to resolve JNI path to Rust path for class type");
-                    let class = class.as_str();
-                    quote!(#class) // XXX
+                    reject_reasons
+                        .push("ERROR:  Failed to resolve JNI path to Rust path for class type");
+                    let class: &str = class.as_str();
+                    quote!(#class)
                 }
             }
         }
     } else {
-        let throwable = context.throwable_rust_path(mod_);
+        let throwable: TokenStream = context.throwable_rust_path(mod_);
 
-        let mut res = match &descriptor.field_type {
+        let mut res: TokenStream = match &descriptor.field_type {
             FieldType::Boolean => quote!(::java_spaghetti::BooleanArray),
             FieldType::Byte => quote!(::java_spaghetti::ByteArray),
             FieldType::Char => quote!(::java_spaghetti::CharArray),
@@ -293,16 +316,17 @@ pub fn emit_type(
             FieldType::Float => quote!(::java_spaghetti::FloatArray),
             FieldType::Double => quote!(::java_spaghetti::DoubleArray),
             FieldType::Object(class_name) => {
-                let class = Id::from(class_name);
+                let class: Id<'_> = Id::from(class_name);
 
                 if !context.all_classes.contains_key(class.as_str()) {
                     reject_reasons.push("ERROR:  missing class for field type");
                 }
 
-                let path = match context.java_to_rust_path(class, mod_) {
+                let path: TokenStream = match context.java_to_rust_path(class, mod_) {
                     Ok(path) => path,
                     Err(_) => {
-                        reject_reasons.push("ERROR:  Failed to resolve JNI path to Rust path for class type");
+                        reject_reasons
+                            .push("ERROR:  Failed to resolve JNI path to Rust path for class type");
                         quote!(???)
                     }
                 };

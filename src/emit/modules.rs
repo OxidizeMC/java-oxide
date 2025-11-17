@@ -1,13 +1,8 @@
-use core::fmt;
-use std::collections::BTreeMap;
-use std::fmt::Write;
-use std::io;
-use std::rc::Rc;
-
-use proc_macro2::{Delimiter, Spacing, TokenStream, TokenTree};
-
 use super::classes::Class;
 use crate::emit::Context;
+use core::fmt;
+use proc_macro2::{Delimiter, Spacing, TokenStream, TokenTree};
+use std::{collections::BTreeMap, fmt::Write, io, rc::Rc};
 
 #[derive(Debug, Default)]
 pub(crate) struct Module {
@@ -27,7 +22,7 @@ impl Module {
         }
 
         for (_, class) in self.classes.iter() {
-            let res = class.write(context)?;
+            let res: TokenStream = class.write(context)?;
             out.write_all(dumb_format(res).as_bytes())?;
         }
 
@@ -42,7 +37,7 @@ impl Module {
 /// intended just to prevent the output from being a single huge line
 /// to make debugging syntax errors easier.
 fn dumb_format(ts: TokenStream) -> String {
-    let mut f = DumbFormatter {
+    let mut f: DumbFormatter = DumbFormatter {
         space: false,
         after_newline: true,
         indent: 1,
@@ -99,8 +94,8 @@ impl DumbFormatter {
                     };
 
                     self.write_str(open);
-                    let ts = tt.stream();
-                    let empty = ts.is_empty();
+                    let ts: TokenStream = tt.stream();
+                    let empty: bool = ts.is_empty();
                     if tt.delimiter() == Delimiter::Brace && !empty {
                         self.indent += 1;
                         self.newline();

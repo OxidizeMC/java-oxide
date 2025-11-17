@@ -1,16 +1,17 @@
-use std::collections::HashSet;
-use std::fmt::Write;
-
-use proc_macro2::TokenStream;
+use super::{cstring, fields::Field, known_docs_url::KnownDocsUrl, methods::Method};
+use crate::{
+    config::ClassConfig,
+    emit::Context,
+    identifiers::{FieldMangling, MethodManglingStyle, rust_ident},
+    parser_util::{Id, IdPart, JavaClass},
+};
+use cafebabe::{FieldInfo, MethodInfo, descriptors::ClassName};
+use proc_macro2::{Ident, Literal, TokenStream};
 use quote::{format_ident, quote};
-
-use super::cstring;
-use super::fields::Field;
-use super::known_docs_url::KnownDocsUrl;
-use super::methods::Method;
-use crate::emit::Context;
-use crate::identifiers::{FieldMangling, rust_ident};
-use crate::parser_util::{Id, IdPart, JavaClass};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Write,
+};
 
 #[derive(Debug, Default)]
 pub(crate) struct StructPaths {
@@ -35,7 +36,7 @@ pub(crate) struct Class {
 
 impl Class {
     pub(crate) fn mod_for(class: Id) -> Result<String, anyhow::Error> {
-        let mut buf = String::new();
+        let mut buf: String = String::new();
         for component in class {
             match component {
                 IdPart::Namespace(id) => {
@@ -52,7 +53,7 @@ impl Class {
     }
 
     pub(crate) fn name_for(class: Id) -> Result<String, anyhow::Error> {
-        let mut buf = String::new();
+        let mut buf: String = String::new();
         for component in class.iter() {
             match component {
                 IdPart::Namespace(_) => {}
@@ -64,17 +65,17 @@ impl Class {
     }
 
     pub(crate) fn new(java: JavaClass) -> Result<Self, anyhow::Error> {
-        let rust = StructPaths::new(java.path())?;
+        let rust: StructPaths = StructPaths::new(java.path())?;
 
         Ok(Self { rust, java })
     }
 
     pub(crate) fn write(&self, context: &Context) -> anyhow::Result<TokenStream> {
-        let cc = context.config.resolve_class(self.java.path().as_str());
+        let cc: ClassConfig<'_> = context.config.resolve_class(self.java.path().as_str());
 
         // Ignored access_flags: SUPER, SYNTHETIC, ANNOTATION, ABSTRACT
 
-        let keyword = if self.java.is_interface() {
+        let keyword: &str = if self.java.is_interface() {
             "interface"
         } else if self.java.is_enum() {
             "enum"
@@ -86,31 +87,31 @@ impl Class {
             "class"
         };
 
-        let visibility = if self.java.is_public() || cc.include_private_classes {
+        let visibility: TokenStream = if self.java.is_public() || cc.include_private_classes {
             quote!(pub)
         } else {
             quote!()
         };
-        let attributes = match self.java.deprecated() {
+        let attributes: TokenStream = match self.java.deprecated() {
             true => quote!(#[deprecated] ),
             false => quote!(),
         };
 
-        let docs = match KnownDocsUrl::from_class(&cc, self.java.path()) {
+        let docs: String = match KnownDocsUrl::from_class(&cc, self.java.path()) {
             Some(url) => format!("{keyword} {url}"),
             None => format!("{keyword} {}", self.java.path().as_str()),
         };
 
-        let rust_name = format_ident!("{}", &self.rust.struct_name);
+        let rust_name: Ident = format_ident!("{}", &self.rust.struct_name);
 
-        let referencetype_impl = match self.java.is_static() {
+        let referencetype_impl: TokenStream = match self.java.is_static() {
             true => quote!(),
             false => quote!(unsafe impl ::java_spaghetti::ReferenceType for #rust_name {}),
         };
 
-        let mut out = TokenStream::new();
+        let mut out: TokenStream = TokenStream::new();
 
-        let java_path = cstring(self.java.path().as_str());
+        let java_path: Literal = cstring(self.java.path().as_str());
 
         out.extend(quote!(
             #[doc = #docs]
@@ -127,15 +128,21 @@ impl Class {
         ));
 
         // recursively visit all superclasses and superinterfaces.
-        let mut queue = Vec::new();
-        let mut visited = HashSet::new();
+        let mut queue: Vec<Id<'_>> = Vec::new();
+        let mut visited: HashSet<Id<'_>> = HashSet::new();
         queue.push(self.java.path());
         visited.insert(self.java.path());
         while let Some(path) = queue.pop() {
-            let class = context.all_classes.get(path.as_str()).unwrap();
-            for path2 in self.java.interfaces().map(|i| Id(i)).chain(class.java.super_path()) {
+            let class: &std::rc::Rc<Class> = context.all_classes.get(path.as_str()).unwrap();
+            for path2 in self
+                .java
+                .interfaces()
+                .map(|i: &ClassName<'_>| Id(i))
+                .chain(class.java.super_path())
+            {
                 if context.all_classes.contains_key(path2.as_str()) && !visited.contains(&path2) {
-                    let rust_path = context.java_to_rust_path(path2, &self.rust.mod_).unwrap();
+                    let rust_path: TokenStream =
+                        context.java_to_rust_path(path2, &self.rust.mod_).unwrap();
                     out.extend(quote!(
                         unsafe impl ::java_spaghetti::AssignableTo<#rust_path> for #rust_name {}
                     ));
@@ -145,13 +152,13 @@ impl Class {
             }
         }
 
-        let mut contents = TokenStream::new();
+        let mut contents: TokenStream = TokenStream::new();
 
-        let object = context
+        let object: TokenStream = context
             .java_to_rust_path(Id("java/lang/Object"), &self.rust.mod_)
             .unwrap();
 
-        let class = cstring(self.java.path().as_str());
+        let class: Literal = cstring(self.java.path().as_str());
 
         contents.extend(quote!(
             fn __class_global_ref(__jni_env: ::java_spaghetti::Env) -> ::java_spaghetti::sys::jobject {
@@ -167,25 +174,27 @@ impl Class {
         let mut methods: Vec<Method> = self
             .java
             .methods()
-            .map(|m| Method::new(&self.java, m))
-            .filter(|m| (m.java.is_public() || cc.include_private_methods) && !m.java.is_bridge())
+            .map(|m: &MethodInfo<'_>| Method::new(&self.java, m))
+            .filter(|m: &Method<'_>| {
+                (m.java.is_public() || cc.include_private_methods) && !m.java.is_bridge()
+            })
             .collect();
         let mut fields: Vec<Field> = self
             .java
             .fields()
-            .map(|f| Field::new(&self.java, f))
-            .filter(|f| f.java.is_public() || cc.include_private_fields)
+            .map(|f: &FieldInfo<'_>| Field::new(&self.java, f))
+            .filter(|f: &Field<'_>| f.java.is_public() || cc.include_private_fields)
             .collect();
 
         self.resolve_collisions(&mut methods, &fields)?;
 
         for method in &mut methods {
-            let res = method.emit(context, &cc, &self.rust.mod_).unwrap();
+            let res: TokenStream = method.emit(context, &cc, &self.rust.mod_).unwrap();
             contents.extend(res);
         }
 
         for field in &mut fields {
-            let res = field.emit(context, &cc, &self.rust.mod_).unwrap();
+            let res: TokenStream = field.emit(context, &cc, &self.rust.mod_).unwrap();
             contents.extend(res);
         }
 
@@ -199,10 +208,8 @@ impl Class {
     }
 
     /// Fills the name_counts map with all field and method names
-    fn fill_name_counts(&self, methods: &[Method], fields: &[Field]) -> std::collections::HashMap<String, usize> {
-        use std::collections::HashMap;
-
-        let mut name_counts = HashMap::new();
+    fn fill_name_counts(&self, methods: &[Method], fields: &[Field]) -> HashMap<String, usize> {
+        let mut name_counts: HashMap<String, usize> = HashMap::new();
 
         // Fill name_counts with all names from fields
         for field in fields {
@@ -232,8 +239,6 @@ impl Class {
     /// Java -> JavaShortSignature -> JavaLongSignature
     /// Only colliding methods are upgraded to the next mangling level.
     fn resolve_collisions(&self, methods: &mut [Method], fields: &[Field]) -> anyhow::Result<()> {
-        use crate::identifiers::MethodManglingStyle;
-
         // Start with all methods using Java style
         for method in methods.iter_mut() {
             method.set_mangling_style(MethodManglingStyle::Java);
@@ -243,9 +248,10 @@ impl Class {
             MethodManglingStyle::JavaShortSignature,
             MethodManglingStyle::JavaLongSignature,
         ] {
-            let name_counts = self.fill_name_counts(methods, fields);
+            let name_counts: std::collections::HashMap<String, usize> =
+                self.fill_name_counts(methods, fields);
 
-            let has_collisions = name_counts.values().any(|&count| count >= 2);
+            let has_collisions: bool = name_counts.values().any(|&count| count >= 2);
             if !has_collisions {
                 return Ok(()); // All names are unique, we're done
             }
@@ -260,8 +266,8 @@ impl Class {
             }
         }
 
-        let name_counts = self.fill_name_counts(methods, fields);
-        let has_collisions = name_counts.values().any(|&count| count >= 2);
+        let name_counts: HashMap<String, usize> = self.fill_name_counts(methods, fields);
+        let has_collisions: bool = name_counts.values().any(|&count| count >= 2);
         if !has_collisions {
             return Ok(()); // All names are unique, we're done
         }

@@ -1,26 +1,27 @@
-use std::marker::PhantomPinned;
-use std::pin::Pin;
-
-pub use cafebabe::ClassAccessFlags;
-use cafebabe::attributes::AttributeData;
-use cafebabe::descriptors::ClassName;
-
 use super::Id;
+pub use cafebabe::ClassAccessFlags;
+use cafebabe::{
+    ClassFile, FieldInfo, MethodInfo,
+    attributes::{AttributeData, AttributeInfo},
+    descriptors::ClassName,
+};
+use std::{marker::PhantomPinned, pin::Pin, slice::Iter};
 
 #[derive(Debug)]
 pub struct JavaClass {
     #[allow(unused)]
     raw_bytes: Pin<Box<(Vec<u8>, PhantomPinned)>>,
-    inner: cafebabe::ClassFile<'static>,
+    inner: ClassFile<'static>,
 }
 
 impl JavaClass {
     pub fn read(raw_bytes: Vec<u8>) -> Result<Self, cafebabe::ParseError> {
-        let pinned = Box::pin((raw_bytes, PhantomPinned));
+        let pinned: Pin<Box<(Vec<u8>, PhantomPinned)>> = Box::pin((raw_bytes, PhantomPinned));
         // SAFETY: `get<'a>(&'a self)` restricts the lifetime parameter of
         // the returned referenced `ClassFile`.
-        let fake_static = unsafe { std::slice::from_raw_parts(pinned.0.as_ptr(), pinned.0.len()) };
-        let inner = cafebabe::parse_class(fake_static)?;
+        let fake_static: &[u8] =
+            unsafe { std::slice::from_raw_parts(pinned.0.as_ptr(), pinned.0.len()) };
+        let inner: ClassFile<'_> = cafebabe::parse_class(fake_static)?;
         Ok(Self {
             raw_bytes: pinned,
             inner,
@@ -28,8 +29,8 @@ impl JavaClass {
     }
 
     // It is probably not possible to implement `Deref` safely.
-    pub fn get<'a>(&'a self) -> &'a cafebabe::ClassFile<'a> {
-        // SAFETY: casts `self.inner` into `cafebabe::ClassFile<'a>` forcefully.
+    pub fn get<'a>(&'a self) -> &'a ClassFile<'a> {
+        // SAFETY: casts `self.inner` into `ClassFile<'a>` forcefully.
         // `cafebabe::parse_class` takes immutable &'a [u8], why is the returned
         // `ClassFile<'a>` invariant over `'a`?
         unsafe { &*(&raw const (self.inner)).cast() }
@@ -76,18 +77,21 @@ impl JavaClass {
     }
 
     pub fn super_path(&self) -> Option<Id<'_>> {
-        self.get().super_class.as_ref().map(|class| Id(class))
+        self.get()
+            .super_class
+            .as_ref()
+            .map(|class: &ClassName<'_>| Id(class))
     }
 
-    pub fn interfaces(&self) -> std::slice::Iter<'_, ClassName<'_>> {
+    pub fn interfaces(&self) -> Iter<'_, ClassName<'_>> {
         self.get().interfaces.iter()
     }
 
-    pub fn fields(&self) -> std::slice::Iter<'_, cafebabe::FieldInfo<'_>> {
+    pub fn fields(&self) -> Iter<'_, FieldInfo<'_>> {
         self.get().fields.iter()
     }
 
-    pub fn methods(&self) -> std::slice::Iter<'_, cafebabe::MethodInfo<'_>> {
+    pub fn methods(&self) -> Iter<'_, MethodInfo<'_>> {
         self.get().methods.iter()
     }
 
@@ -95,6 +99,6 @@ impl JavaClass {
         self.get()
             .attributes
             .iter()
-            .any(|attr| matches!(attr.data, AttributeData::Deprecated))
+            .any(|attr: &AttributeInfo<'_>| matches!(attr.data, AttributeData::Deprecated))
     }
 }

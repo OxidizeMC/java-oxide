@@ -1,6 +1,6 @@
 // Migrated from <https://docs.rs/jreflection/0.0.11/src/jreflection/class.rs.html>.
 
-// XXX: This may really be `#[repr(transparent)] pub struct Id(str);`...
+// FIXME: This may really be `#[repr(transparent)] pub struct Id(str);`...
 // Also, patterns apparently can't handle Id::new(...) even when it's a const fn.
 
 /// Borrowed Java class binary name (internal form).
@@ -16,7 +16,7 @@ impl<'a> Id<'a> {
     }
 
     pub fn is_string_class(&self) -> bool {
-        let mut iter = self.into_iter();
+        let mut iter: IdIter<'_> = self.into_iter();
         iter.next() == Some(IdPart::Namespace("java"))
             && iter.next() == Some(IdPart::Namespace("lang"))
             && iter.next() == Some(IdPart::LeafClass("String"))
@@ -61,19 +61,19 @@ impl<'a> Iterator for IdIter<'a> {
     type Item = IdPart<'a>;
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(slash) = self.rest.find('/') {
-            let (namespace, rest) = self.rest.split_at(slash);
+            let (namespace, rest): (&str, &str) = self.rest.split_at(slash);
             self.rest = &rest[1..];
             return Some(IdPart::Namespace(namespace));
         }
 
         if let Some(dollar) = self.rest.find('$') {
-            let (class, rest) = self.rest.split_at(dollar);
+            let (class, rest): (&str, &str) = self.rest.split_at(dollar);
             self.rest = &rest[1..];
             return Some(IdPart::ContainingClass(class));
         }
 
         if !self.rest.is_empty() {
-            let class = self.rest;
+            let class: &str = self.rest;
             self.rest = "";
             return Some(IdPart::LeafClass(class));
         }
@@ -86,7 +86,10 @@ impl<'a> Iterator for IdIter<'a> {
 fn id_iter_test() {
     assert_eq!(Id("").iter().collect::<Vec<_>>(), &[]);
 
-    assert_eq!(Id("Bar").iter().collect::<Vec<_>>(), &[IdPart::LeafClass("Bar"),]);
+    assert_eq!(
+        Id("Bar").iter().collect::<Vec<_>>(),
+        &[IdPart::LeafClass("Bar"),]
+    );
 
     assert_eq!(
         Id("java/foo/Bar").iter().collect::<Vec<_>>(),
@@ -108,7 +111,9 @@ fn id_iter_test() {
     );
 
     assert_eq!(
-        Id("java/foo/Bar$Inner$MoreInner").iter().collect::<Vec<_>>(),
+        Id("java/foo/Bar$Inner$MoreInner")
+            .iter()
+            .collect::<Vec<_>>(),
         &[
             IdPart::Namespace("java"),
             IdPart::Namespace("foo"),

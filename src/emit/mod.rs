@@ -7,23 +7,14 @@ pub mod java_proxy;
 mod known_docs_url;
 mod methods;
 mod modules;
-mod preamble;
 
-use std::collections::HashMap;
-use std::ffi::CString;
-use std::io;
-use std::rc::Rc;
-use std::str::FromStr;
-use std::sync::Mutex;
-use std::time::Duration;
-
+use self::{classes::Class, modules::Module};
+use crate::{config, io_data_err, parser_util, util};
 use proc_macro2::{Literal, TokenStream};
 use quote::{TokenStreamExt, format_ident, quote};
-
-use self::classes::Class;
-use self::modules::Module;
-use self::preamble::write_preamble;
-use crate::{config, parser_util, util};
+use std::{
+    collections::HashMap, ffi::CString, io, rc::Rc, str::FromStr, sync::Mutex, time::Duration,
+};
 
 pub struct Context<'a> {
     pub(crate) config: &'a config::Config,
@@ -49,23 +40,27 @@ impl<'a> Context<'a> {
             .unwrap()
     }
 
-    pub fn java_to_rust_path(&self, java_class: parser_util::Id, mod_: &str) -> Result<TokenStream, anyhow::Error> {
-        let m = Class::mod_for(java_class)?;
-        let s = Class::name_for(java_class)?;
-        let fqn = format!("{m}::{s}");
+    pub fn java_to_rust_path(
+        &self,
+        java_class: parser_util::Id,
+        mod_: &str,
+    ) -> Result<TokenStream, anyhow::Error> {
+        let m: String = Class::mod_for(java_class)?;
+        let s: String = Class::name_for(java_class)?;
+        let fqn: String = format!("{m}::{s}");
 
         // Calculate relative path from B to A.
         let b: Vec<&str> = mod_.split("::").collect();
         let a: Vec<&str> = fqn.split("::").collect();
 
-        let mut ma = &a[..a.len() - 1];
-        let mut mb = &b[..];
+        let mut ma: &[&str] = &a[..a.len() - 1];
+        let mut mb: &[&str] = &b[..];
         while !ma.is_empty() && !mb.is_empty() && ma[0] == mb[0] {
             ma = &ma[1..];
             mb = &mb[1..];
         }
 
-        let mut res = TokenStream::new();
+        let mut res: TokenStream = TokenStream::new();
 
         // for each item left in b, append a `super`
         for _ in mb {
@@ -74,28 +69,28 @@ impl<'a> Context<'a> {
 
         // for each item in a, append it
         for ident in ma {
-            let ident = format_ident!("{}", ident);
+            let ident: proc_macro2::Ident = format_ident!("{}", ident);
             res.extend(quote!(#ident::));
         }
 
-        let ident = format_ident!("{}", a[a.len() - 1]);
+        let ident: proc_macro2::Ident = format_ident!("{}", a[a.len() - 1]);
         res.append(ident);
 
         Ok(res)
     }
 
     pub fn add_class(&mut self, class: parser_util::JavaClass) -> Result<(), anyhow::Error> {
-        let cc = self.config.resolve_class(class.path().as_str());
+        let cc: config::ClassConfig<'_> = self.config.resolve_class(class.path().as_str());
         if !cc.include {
             return Ok(());
         }
 
-        let java_path = class.path().as_str().to_string();
-        let s = Rc::new(Class::new(class)?);
+        let java_path: String = class.path().as_str().to_string();
+        let s: Rc<Class> = Rc::new(Class::new(class)?);
 
         self.all_classes.insert(java_path, s.clone());
 
-        let mut rust_mod = &mut self.module;
+        let mut rust_mod: &mut Module = &mut self.module;
         for fragment in s.rust.mod_.split("::") {
             rust_mod = rust_mod.modules.entry(fragment.to_owned()).or_default();
         }
@@ -111,7 +106,7 @@ impl<'a> Context<'a> {
     }
 
     pub fn write(&self, out: &mut impl io::Write) -> anyhow::Result<()> {
-        write_preamble(out)?;
+        write!(out, "{}\n\n", include_str!("preamble.rs"))?;
         self.module.write(self, out)
     }
 }

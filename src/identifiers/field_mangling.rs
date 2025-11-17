@@ -1,5 +1,4 @@
-use crate::identifiers::rust_ident;
-use crate::parser_util::JavaField;
+use crate::{identifiers::rust_ident, parser_util::JavaField};
 
 pub enum FieldMangling<'a> {
     ConstValue(String, cafebabe::constant_pool::LiteralConstant<'a>),
@@ -7,9 +6,9 @@ pub enum FieldMangling<'a> {
 }
 
 pub fn mangle_field<'a>(field: JavaField<'a>) -> Result<FieldMangling<'a>, anyhow::Error> {
-    let field_name = field.name();
+    let field_name: &str = field.name();
     if let Some(value) = field.constant().as_ref() {
-        let name = rust_ident(field_name)?;
+        let name: String = rust_ident(field_name)?;
         Ok(FieldMangling::ConstValue(name, value.clone()))
     } else {
         Ok(FieldMangling::GetSet(

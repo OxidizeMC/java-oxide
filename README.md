@@ -43,4 +43,4 @@ A list of differences from `jni-bindgen` are listed in [`java-spaghetti`'s READM
 
 ## License
 
-Licensed under the dMIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
+Licensed under the MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)

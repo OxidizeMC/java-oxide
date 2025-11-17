@@ -1,43 +1,45 @@
-use std::fmt::Write;
-
+use super::{classes::Class, cstring, fields::RustTypeFlavor, methods::Method};
+use crate::{
+    emit::{Context, fields::emit_type},
+    parser_util::Id,
+};
 use cafebabe::descriptors::{FieldDescriptor, FieldType, ReturnDescriptor};
-use proc_macro2::TokenStream;
+use proc_macro2::{Ident, Literal, TokenStream};
 use quote::{format_ident, quote};
-
-use super::classes::Class;
-use super::cstring;
-use super::fields::RustTypeFlavor;
-use super::methods::Method;
-use crate::emit::Context;
-use crate::emit::fields::emit_type;
-use crate::parser_util::Id;
+use std::fmt::Write;
 
 impl Class {
     #[allow(clippy::vec_init_then_push)]
-    pub(crate) fn write_proxy(&self, context: &Context, methods: &[Method]) -> anyhow::Result<TokenStream> {
-        let mut emit_reject_reasons = Vec::new();
+    pub(crate) fn write_proxy(
+        &self,
+        context: &Context,
+        methods: &[Method],
+    ) -> anyhow::Result<TokenStream> {
+        let mut emit_reject_reasons: Vec<&'static str> = Vec::new();
 
-        let mut out = TokenStream::new();
-        let mut contents = TokenStream::new();
+        let mut out: TokenStream = TokenStream::new();
+        let mut contents: TokenStream = TokenStream::new();
 
-        let rust_name = format_ident!("{}", &self.rust.struct_name);
+        let rust_name: Ident = format_ident!("{}", &self.rust.struct_name);
 
-        let object = context
+        let object: TokenStream = context
             .java_to_rust_path(Id("java/lang/Object"), &self.rust.mod_)
             .unwrap();
-        let throwable = context.throwable_rust_path(&self.rust.mod_);
-        let rust_proxy_name = format_ident!("{}Proxy", &self.rust.struct_name);
+        let throwable: TokenStream = context.throwable_rust_path(&self.rust.mod_);
+        let rust_proxy_name: Ident = format_ident!("{}Proxy", &self.rust.struct_name);
 
-        let mut trait_methods = TokenStream::new();
+        let mut trait_methods: TokenStream = TokenStream::new();
 
-        let java_proxy_path = format!(
+        let java_proxy_path: String = format!(
             "{}/{}",
             context.config.proxy_package,
             self.java.path().as_str().replace("$", "_")
         );
 
         for method in methods {
-            let Some(rust_name) = method.rust_name() else { continue };
+            let Some(rust_name) = method.rust_name() else {
+                continue;
+            };
             if method.java.is_static()
                 || method.java.is_static_init()
                 || method.java.is_constructor()
@@ -47,21 +49,21 @@ impl Class {
                 continue;
             }
 
-            let mut native_params = Vec::new();
+            let mut native_params: Vec<FieldDescriptor<'_>> = Vec::new();
             native_params.push(FieldDescriptor {
                 dimensions: 0,
                 field_type: FieldType::Long,
             });
             native_params.extend(method.java.descriptor.parameters.iter().cloned());
-            let native_name = mangle_native_method(
+            let native_name: String = mangle_native_method(
                 &java_proxy_path,
                 &format!("native_{}", method.java.name()),
                 &native_params,
             );
-            let native_name = format_ident!("{native_name}");
-            let rust_name = format_ident!("{rust_name}");
+            let native_name: Ident = format_ident!("{native_name}");
+            let rust_name: Ident = format_ident!("{rust_name}");
 
-            let ret = match &method.java.descriptor.return_type {
+            let ret: TokenStream = match &method.java.descriptor.return_type {
                 ReturnDescriptor::Void => quote!(()),
                 ReturnDescriptor::Return(desc) => emit_type(
                     desc,
@@ -72,14 +74,14 @@ impl Class {
                 )?,
             };
 
-            let mut trait_args = TokenStream::new();
-            let mut native_args = TokenStream::new();
-            let mut native_convert_args = TokenStream::new();
+            let mut trait_args: TokenStream = TokenStream::new();
+            let mut native_args: TokenStream = TokenStream::new();
+            let mut native_convert_args: TokenStream = TokenStream::new();
 
             for (arg_idx, arg) in method.java.descriptor.parameters.iter().enumerate() {
-                let arg_name = format_ident!("arg{}", arg_idx);
+                let arg_name: Ident = format_ident!("arg{}", arg_idx);
 
-                let trait_arg_type = emit_type(
+                let trait_arg_type: TokenStream = emit_type(
                     arg,
                     context,
                     &self.rust.mod_,
@@ -88,7 +90,7 @@ impl Class {
                 )?;
                 trait_args.extend(quote!(#arg_name: #trait_arg_type,));
 
-                let native_arg_type = emit_type(
+                let native_arg_type: TokenStream = emit_type(
                     arg,
                     context,
                     &self.rust.mod_,
@@ -127,13 +129,14 @@ impl Class {
             ));
         }
 
-        let mut native_params = Vec::new();
+        let mut native_params: Vec<FieldDescriptor<'_>> = Vec::new();
         native_params.push(FieldDescriptor {
             dimensions: 0,
             field_type: FieldType::Long,
         });
-        let native_name = mangle_native_method(&java_proxy_path, "native_finalize", &native_params);
-        let native_name = format_ident!("{native_name}");
+        let native_name: String =
+            mangle_native_method(&java_proxy_path, "native_finalize", &native_params);
+        let native_name: Ident = format_ident!("{native_name}");
 
         out.extend(quote!(
             pub trait #rust_proxy_name: ::std::marker::Send + ::std::marker::Sync + 'static {
@@ -151,7 +154,7 @@ impl Class {
             }
         ));
 
-        let java_proxy_path = cstring(&java_proxy_path);
+        let java_proxy_path: Literal = cstring(&java_proxy_path);
 
         contents.extend(quote!(
             pub fn new_proxy<'env>(
@@ -192,7 +195,6 @@ impl Class {
         out.extend(quote!(impl #rust_name { #contents }));
 
         if !emit_reject_reasons.is_empty() {
-            // TODO log
             return Ok(TokenStream::new());
         }
 
@@ -201,7 +203,7 @@ impl Class {
 }
 
 fn mangle_native_method(path: &str, name: &str, args: &[FieldDescriptor]) -> String {
-    let mut res = String::new();
+    let mut res: String = String::new();
     res.push_str("Java_");
     res.push_str(&mangle_native(path));
     res.push('_');
@@ -215,7 +217,7 @@ fn mangle_native_method(path: &str, name: &str, args: &[FieldDescriptor]) -> Str
 }
 
 fn mangle_native(s: &str) -> String {
-    let mut res = String::new();
+    let mut res: String = String::new();
     for c in s.chars() {
         match c {
             '0'..='9' | 'a'..='z' | 'A'..='Z' => res.push(c),

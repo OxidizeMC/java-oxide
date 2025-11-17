@@ -1,21 +1,23 @@
-use cafebabe::FieldAccessFlags;
-use cafebabe::attributes::AttributeData;
-use cafebabe::constant_pool::LiteralConstant;
-use cafebabe::descriptors::FieldDescriptor;
+use cafebabe::{
+    FieldAccessFlags, FieldInfo,
+    attributes::{AttributeData, AttributeInfo},
+    constant_pool::LiteralConstant,
+    descriptors::FieldDescriptor,
+};
 
 #[derive(Clone, Copy, Debug)]
 pub struct JavaField<'a> {
-    java: &'a cafebabe::FieldInfo<'a>,
+    java: &'a FieldInfo<'a>,
 }
 
-impl<'a> From<&'a cafebabe::FieldInfo<'a>> for JavaField<'a> {
-    fn from(value: &'a cafebabe::FieldInfo<'a>) -> Self {
+impl<'a> From<&'a FieldInfo<'a>> for JavaField<'a> {
+    fn from(value: &'a FieldInfo<'a>) -> Self {
         Self { java: value }
     }
 }
 
 impl<'a> std::ops::Deref for JavaField<'a> {
-    type Target = cafebabe::FieldInfo<'a>;
+    type Target = FieldInfo<'a>;
     fn deref(&self) -> &Self::Target {
         self.java
     }
@@ -73,19 +75,21 @@ impl<'a> JavaField<'a> {
         if !self.is_static() || !self.is_final() {
             return None;
         }
-        self.attributes.iter().find_map(|attr| {
-            if let AttributeData::ConstantValue(c) = &attr.data {
-                Some(c.clone())
-            } else {
-                None
-            }
-        })
+        self.attributes
+            .iter()
+            .find_map(|attr: &AttributeInfo<'a>| -> Option<LiteralConstant<'_>> {
+                if let AttributeData::ConstantValue(c) = &attr.data {
+                    Some(c.clone())
+                } else {
+                    None
+                }
+            })
     }
 
     pub fn deprecated(&self) -> bool {
         self.attributes
             .iter()
-            .any(|attr| matches!(attr.data, AttributeData::Deprecated))
+            .any(|attr: &AttributeInfo<'a>| matches!(attr.data, AttributeData::Deprecated))
     }
 
     pub fn descriptor<'s>(&'s self) -> &'a FieldDescriptor<'a> {

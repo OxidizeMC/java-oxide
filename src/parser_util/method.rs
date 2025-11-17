@@ -1,19 +1,21 @@
-use cafebabe::MethodAccessFlags;
-use cafebabe::attributes::AttributeData;
-use cafebabe::descriptors::MethodDescriptor;
+use cafebabe::{
+    MethodAccessFlags, MethodInfo,
+    attributes::{AttributeData, AttributeInfo},
+    descriptors::MethodDescriptor,
+};
 
 pub struct JavaMethod<'a> {
-    java: &'a cafebabe::MethodInfo<'a>,
+    java: &'a MethodInfo<'a>,
 }
 
-impl<'a> From<&'a cafebabe::MethodInfo<'a>> for JavaMethod<'a> {
-    fn from(value: &'a cafebabe::MethodInfo<'a>) -> Self {
+impl<'a> From<&'a MethodInfo<'a>> for JavaMethod<'a> {
+    fn from(value: &'a MethodInfo<'a>) -> Self {
         Self { java: value }
     }
 }
 
 impl<'a> std::ops::Deref for JavaMethod<'a> {
-    type Target = cafebabe::MethodInfo<'a>;
+    type Target = MethodInfo<'a>;
     fn deref(&self) -> &Self::Target {
         self.java
     }
@@ -92,7 +94,7 @@ impl<'a> JavaMethod<'a> {
     pub fn deprecated(&self) -> bool {
         self.attributes
             .iter()
-            .any(|attr| matches!(attr.data, AttributeData::Deprecated))
+            .any(|attr: &AttributeInfo<'a>| matches!(attr.data, AttributeData::Deprecated))
     }
 
     pub fn descriptor<'s>(&'s self) -> &'a MethodDescriptor<'a> {

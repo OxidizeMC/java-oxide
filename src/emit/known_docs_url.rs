@@ -1,10 +1,10 @@
-use std::fmt::{self, Display, Formatter};
-
-use cafebabe::descriptors::{FieldDescriptor, FieldType};
-
 use super::methods::Method;
-use crate::config::ClassConfig;
-use crate::parser_util::Id;
+use crate::{
+    config::{ClassConfig, DocPattern},
+    parser_util::Id,
+};
+use cafebabe::descriptors::{FieldDescriptor, FieldType};
+use std::fmt::{self, Display, Formatter};
 
 pub(crate) struct KnownDocsUrl {
     pub(crate) label: String,
@@ -19,8 +19,8 @@ impl Display for KnownDocsUrl {
 
 impl KnownDocsUrl {
     pub(crate) fn from_class(config: &ClassConfig, java_class: Id) -> Option<KnownDocsUrl> {
-        let java_class = java_class.as_str();
-        let pattern = config.doc_pattern?;
+        let java_class: &str = java_class.as_str();
+        let pattern: &DocPattern = config.doc_pattern?;
 
         for ch in java_class.chars() {
             match ch {
@@ -32,14 +32,14 @@ impl KnownDocsUrl {
             }
         }
 
-        let last_slash = java_class.rfind('/');
-        let no_namespace = if let Some(last_slash) = last_slash {
+        let last_slash: Option<usize> = java_class.rfind('/');
+        let no_namespace: &str = if let Some(last_slash) = last_slash {
             &java_class[(last_slash + 1)..]
         } else {
             java_class
         };
 
-        let java_class = java_class
+        let java_class: String = java_class
             .replace('/', pattern.class_namespace_separator.as_str())
             .replace('$', pattern.class_inner_class_seperator.as_str());
 
@@ -53,10 +53,10 @@ impl KnownDocsUrl {
     }
 
     pub(crate) fn from_method(config: &ClassConfig, method: &Method) -> Option<KnownDocsUrl> {
-        let is_constructor = method.java.is_constructor();
+        let is_constructor: bool = method.java.is_constructor();
 
-        let pattern = config.doc_pattern?;
-        let url_pattern = if is_constructor {
+        let pattern: &DocPattern = config.doc_pattern?;
+        let url_pattern: &String = if is_constructor {
             pattern
                 .constructor_url_pattern
                 .as_ref()
@@ -75,14 +75,14 @@ impl KnownDocsUrl {
             }
         }
 
-        let java_class = method
+        let java_class: String = method
             .class
             .path()
             .as_str()
             .replace('/', pattern.class_namespace_separator.as_str())
             .replace('$', pattern.class_inner_class_seperator.as_str());
 
-        let java_outer_class = method
+        let java_outer_class: String = method
             .class
             .path()
             .as_str()
@@ -91,7 +91,7 @@ impl KnownDocsUrl {
             .unwrap()
             .replace('$', pattern.class_inner_class_seperator.as_str());
 
-        let java_inner_class = method
+        let java_inner_class: &str = method
             .class
             .path()
             .as_str()
@@ -102,7 +102,7 @@ impl KnownDocsUrl {
             .next()
             .unwrap();
 
-        let label = if is_constructor {
+        let label: &str = if is_constructor {
             java_inner_class
         } else {
             for ch in method.java.name().chars() {
@@ -117,9 +117,9 @@ impl KnownDocsUrl {
             method.java.name()
         };
 
-        let mut java_args = String::new();
+        let mut java_args: String = String::new();
 
-        let mut prev_was_array = false;
+        let mut prev_was_array: bool = false;
         for arg in method.java.descriptor().parameters.iter() {
             if prev_was_array {
                 prev_was_array = false;
@@ -130,7 +130,7 @@ impl KnownDocsUrl {
                 java_args.push_str(&pattern.argument_seperator[..]);
             }
 
-            let obj_arg;
+            let obj_arg: String;
             java_args.push_str(match arg.field_type {
                 FieldType::Boolean => "boolean",
                 FieldType::Byte => "byte",
@@ -141,7 +141,7 @@ impl KnownDocsUrl {
                 FieldType::Float => "float",
                 FieldType::Double => "double",
                 FieldType::Object(ref class_name) => {
-                    let class = Id::from(class_name);
+                    let class: Id<'_> = Id::from(class_name);
                     obj_arg = class
                         .as_str()
                         .replace('/', pattern.argument_namespace_separator.as_str())
@@ -185,8 +185,8 @@ impl KnownDocsUrl {
         java_field: &str,
         _java_descriptor: FieldDescriptor,
     ) -> Option<KnownDocsUrl> {
-        let pattern = config.doc_pattern?;
-        let field_url_pattern = pattern.field_url_pattern.as_ref()?;
+        let pattern: &DocPattern = config.doc_pattern?;
+        let field_url_pattern: &String = pattern.field_url_pattern.as_ref()?;
 
         for ch in java_class.chars() {
             match ch {
@@ -208,7 +208,7 @@ impl KnownDocsUrl {
             }
         }
 
-        let java_class = java_class
+        let java_class: String = java_class
             .replace('/', pattern.class_namespace_separator.as_str())
             .replace('$', pattern.class_inner_class_seperator.as_str());
 
