@@ -1,3 +1,4 @@
+#![feature(arbitrary_self_types)]
 #![allow(unused_imports)]
 #![allow(non_camel_case_types)] // We map Java inner classes to Outer_Inner
 #![allow(dead_code)] // We generate structs for private Java types too, just in case.
