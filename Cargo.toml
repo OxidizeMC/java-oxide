@@ -1,6 +1,27 @@
-[workspace]
-resolver = "2"
-members = [
-    "java-spaghetti",
-    "java-spaghetti-gen",
-]
+[package]
+name = "java-oxide"
+version = "0.0.0-dev.1"
+edition = "2024"
+authors = ["PitchBlackNights <pitchblacknights@proton.me>"]
+description = "Code generator for binding to JVM APIs from Rust"
+repository = "https://github.com/OxidizeMC/java-oxide"
+keywords = ["jvm", "jni", "bindgen"]
+categories = ["development-tools::ffi"]
+license = "MIT"
+readme = "README.md"
+
+[dependencies]
+cafebabe = "0.9.0"
+clap = { version = "4", features = ["derive"] }
+bitflags = "2.8.0"
+serde = "1.0.197"
+serde_derive = "1.0.197"
+zip = "4.6.1"
+quote = "1.0.40"
+proc-macro2 = "1.0.95"
+anyhow = "1.0.98"
+serde_yaml = "0.9.34"
+glob = "0.3"
+
+[dev-dependencies]
+jni-sys  = "0.4.0"
