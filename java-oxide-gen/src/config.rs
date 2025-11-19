@@ -366,9 +366,17 @@ impl Config {
         if let Some(output) = &mut config.proxy.output {
             *output = resolve_file(output, dir)?;
         }
-        for f in &mut config.src.inputs {
-            *f = resolve_file(f, dir)?
+        let mut new_inputs: Vec<PathBuf> = Vec::new();
+        for p in &mut config.src.inputs {
+            *p = resolve_file(p, dir)?;
+            let p_str: String = p.to_string_lossy().to_string();
+            if glob::Pattern::new(&p_str.as_str()).is_ok() && p_str.contains("*") {
+                debug!("{:?} is glob valid", pretty_path!(p));
+                // TODO: Implement glob path matching
+                new_inputs.push(PathBuf::new());
+            }
         }
+        config.src.inputs.extend(new_inputs);
 
         config.proxy.package = config.proxy.package.replace(".", "/");
         if let Some(docs) = &mut config.docs {

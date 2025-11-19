@@ -1,7 +1,8 @@
-[source]
+[sources]
 inputs = [
-    "./jars/fabric-loader-0.17.3.jar",
-    "./jars/java-21-base.jar"
+    "./jars/java-21-base.jar",
+    # "./jars/fabric-api-0.138.3+1.21.10.jar"
+    "./jars/fabric-api-0.138.3+1.21.10/*.jar"
 ]
 output = "./src/lib.rs"
 
@@ -11,34 +12,73 @@ output = "./java-proxy"
 
 [[doc]]
 match = [
-    "net.fabricmc.api.**",
-    "net.fabricmc.loader.api.**",
+    "net.fabricmc.fabric.api.**",
 ]
-class-url = "https://maven.fabricmc.net/docs/fabric-loader-0.17.3/{CLASS}.html"
-method-url = "https://maven.fabricmc.net/docs/fabric-loader-0.17.3/{CLASS}.html#{METHOD}({ARGUMENTS})"
-field-url = "https://maven.fabricmc.net/docs/fabric-loader-0.17.3/{CLASS}.html#{FIELD}"
-constructor-url = "https://maven.fabricmc.net/docs/fabric-loader-0.17.3/{CLASS}.html#{CLASS.INNER}({ARGUMENTS})"
+class-url = "https://maven.fabricmc.net/docs/fabric-api-0.138.3+1.21.10/{CLASS}.html"
+method-url = "https://maven.fabricmc.net/docs/fabric-api-0.138.3+1.21.10/{CLASS}.html#{METHOD}({ARGUMENTS})"
+field-url = "https://maven.fabricmc.net/docs/fabric-api-0.138.3+1.21.10/{CLASS}.html#{FIELD}"
+constructor-url = "https://maven.fabricmc.net/docs/fabric-api-0.138.3+1.21.10/{CLASS}.html#{CLASS.INNER}({ARGUMENTS})"
 
 [[include]]
 match = [
-    "net.fabricmc.api.**",
-    "net.fabricmc.loader.api.**",
+    "net.fabricmc.fabric.api.**",
     "java.util.Collection",
-    "java.util.function.Consumer",
-    "java.util.function.BiConsumer",
+    # "java.util.function.Consumer",
+    # "java.util.function.BiConsumer",
     "java.lang.String",
-    "java.lang.Class",
+    # "java.lang.Class",
     "java.lang.Throwable",
     "java.lang.StackTraceElement",
     "java.lang.Object",
 ]
 bind = true
 
+# net.fabricmc.fabric.api.event.lifecycle.v1.*
 [[include]]
 match = [
-    "net.fabricmc.api.ClientModInitializer",
-    "net.fabricmc.api.DedicatedServerModInitializer",
-    "net.fabricmc.api.ModInitializer",
-    "net.fabricmc.loader.api.entrypoint.PreLaunchEntrypoint",
+    "net.fabricmc.fabric.api.event.lifecycle.v1.CommonLifecycleEvents$TagsLoaded",
+    "net.fabricmc.fabric.api.event.lifecycle.v1.ServerBlockEntityEvents$Unload",
+    "net.fabricmc.fabric.api.event.lifecycle.v1.ServerBlockEntityEvents$Load",
+    "net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents$LevelTypeChange",
+    "net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents$Unload",
+    "net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents$Generate",
+    "net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents$Load",
+    "net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents$EquipmentChange",
+    "net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents$Unload",
+    "net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents$Load",
+    "net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents$AfterSave",
+    "net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents$BeforeSave",
+    "net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents$EndDataPackReload",
+    "net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents$StartDataPackReload",
+    "net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents$SyncDataPackContents",
+    "net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents$ServerStopped",
+    "net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents$ServerStopping",
+    "net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents$ServerStarted",
+    "net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents$ServerStarting",
+    "net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents$EndWorldTick",
+    "net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents$StartWorldTick",
+    "net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents$EndTick",
+    "net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents$StartTick",
+    "net.fabricmc.fabric.api.event.lifecycle.v1.ServerWorldEvents$Unload",
+    "net.fabricmc.fabric.api.event.lifecycle.v1.ServerWorldEvents$Load"
+]
+proxy = true
+
+# net.fabricmc.fabric.api.client.event.lifecycle.v1.*
+[[include]]
+match = [
+    "net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientBlockEntityEvents$Unload",
+    "net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientBlockEntityEvents$Load",
+    "net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientChunkEvents$Unload",
+    "net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientChunkEvents$Load",
+    "net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientEntityEvents$Unload",
+    "net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientEntityEvents$Load",
+    "net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents$ClientStopping",
+    "net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents$ClientStarted",
+    "net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents$EndWorldTick",
+    "net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents$StartWorldTick",
+    "net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents$EndTick",
+    "net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents$StartTick",
+    "met.fabricmc.fabric.api.client.event.lifecycle.v1.ClientWorldEvents$AfterClientWorldChange"
 ]
 proxy = true

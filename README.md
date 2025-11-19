@@ -32,14 +32,15 @@ A list of differences from `jni-bindgen` are listed in [`java-spaghetti`'s READM
 
 ## TODO
 
-- [ ] Switch back to a `.toml` configuration format
+- [X] Switch back to a `.toml` configuration format
+- [ ] Allow Glob Paths as inputs
+- [ ] Fix indeterminism in what JARs are read and when? (unconfirmed right now)
+- [ ] Use `ristretto_classfile` instead of `cafebabe`
 - [ ] Fix formatting issues
   - [ ] Use absolute paths (`crate::...`)
   - [ ] "Correctly" format generated code
-- [ ] Use `ristretto_classfile` instead of `cafebabe`
-- [ ] Fix indeterminism in what JARs are read and when
+- [ ] Implement stub generation
 - [ ] Actually do documentation
-- [ ] Stub generation?
 
 ## License
 
