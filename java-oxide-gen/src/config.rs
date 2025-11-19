@@ -41,18 +41,18 @@ pub struct IncludeConfig {
 
     /// Whether to generate Java bindings
     #[serde(default)]
-    pub bind: bool,
+    pub bind: Option<bool>,
 
     #[serde(default)]
-    pub bind_private_classes: bool,
+    pub bind_private_classes: Option<bool>,
     #[serde(default)]
-    pub bind_private_methods: bool,
+    pub bind_private_methods: Option<bool>,
     #[serde(default)]
-    pub bind_private_fields: bool,
+    pub bind_private_fields: Option<bool>,
 
     /// Whether to generate Java proxies. Setting to 'proxy = true' will force 'bind = true'
     #[serde(default)]
-    pub proxy: bool,
+    pub proxy: Option<bool>,
 }
 impl IncludeConfig {
     pub fn check(&self) -> Result<(), Vec<&'static str>> {
@@ -63,11 +63,13 @@ impl IncludeConfig {
         if self.matches.iter().any(|x: &String| x.is_empty()) {
             errors.push("Zero length strings are not allowed in 'include.match'");
         }
-        if !self.bind && !self.proxy {
+        if self.bind.is_none() && self.proxy.is_none() {
             errors.push("Either 'include.bind' or 'include.proxy' must be set to true");
         }
-        if !self.bind
-            && (self.bind_private_classes || self.bind_private_fields || self.bind_private_methods)
+        if self.bind.is_none()
+            && (self.bind_private_classes.is_some()
+                || self.bind_private_fields.is_some()
+                || self.bind_private_methods.is_some())
         {
             errors.push(
                 "'include.bind' must also be set to true if any 'include.bind-private-*' values are set to true",
@@ -453,24 +455,73 @@ impl Config {
     }
 
     pub fn resolve_class(&self, class: &str) -> ClassConfig<'_> {
-        let mut res: ClassConfig<'_> = ClassConfig {
-            bind: false,
-            bind_private_classes: false,
-            bind_private_methods: false,
-            bind_private_fields: false,
-            proxy: false,
-            doc_pattern: None,
+        // false > true > None
+        let mut temp_config: TempClassConfig = TempClassConfig {
+            bind: None,
+            bind_private_classes: None,
+            bind_private_methods: None,
+            bind_private_fields: None,
+            proxy: None,
         };
 
         for rule in &self.rules {
             if rule.matches_class(class) {
-                res.bind |= rule.bind;
-                res.bind_private_classes |= rule.bind_private_classes;
-                res.bind_private_methods |= rule.bind_private_methods;
-                res.bind_private_fields |= rule.bind_private_fields;
-                res.proxy |= rule.proxy;
+                if temp_config.bind.is_none() {
+                    temp_config.bind = rule.bind;
+                } else if temp_config.bind == Some(true) && rule.bind.is_some() {
+                    temp_config.bind = rule.bind;
+                }
+
+                if temp_config.bind_private_classes.is_none() {
+                    temp_config.bind_private_classes = rule.bind_private_classes;
+                } else if temp_config.bind_private_classes == Some(true)
+                    && rule.bind_private_classes.is_some()
+                {
+                    temp_config.bind_private_classes = rule.bind_private_classes;
+                }
+
+                if temp_config.bind_private_methods.is_none() {
+                    temp_config.bind_private_methods = rule.bind_private_methods;
+                } else if temp_config.bind_private_methods == Some(true)
+                    && rule.bind_private_methods.is_some()
+                {
+                    temp_config.bind_private_methods = rule.bind_private_methods;
+                }
+
+                if temp_config.bind_private_fields.is_none() {
+                    temp_config.bind_private_fields = rule.bind_private_fields;
+                } else if temp_config.bind_private_fields == Some(true)
+                    && rule.bind_private_fields.is_some()
+                {
+                    temp_config.bind_private_fields = rule.bind_private_fields;
+                }
+
+                if temp_config.proxy.is_none() {
+                    temp_config.proxy = rule.proxy;
+                } else if temp_config.proxy == Some(true) && rule.proxy.is_some() {
+                    temp_config.proxy = rule.proxy;
+                }
             }
         }
+
+        if temp_config.bind == Some(false) {
+            temp_config.bind_private_classes = Some(false);
+            temp_config.bind_private_methods = Some(false);
+            temp_config.bind_private_fields = Some(false);
+        }
+
+        if temp_config.proxy == Some(true) {
+            temp_config.bind = Some(true);
+        }
+
+        let mut res: ClassConfig<'_> = ClassConfig {
+            bind: temp_config.bind.unwrap_or_default(),
+            bind_private_classes: temp_config.bind_private_classes.unwrap_or_default(),
+            bind_private_methods: temp_config.bind_private_methods.unwrap_or_default(),
+            bind_private_fields: temp_config.bind_private_fields.unwrap_or_default(),
+            proxy: temp_config.proxy.unwrap_or_default(),
+            doc_pattern: None,
+        };
 
         if let Some(docs) = &self.docs {
             for pattern in docs {
@@ -492,6 +543,15 @@ pub struct ClassConfig<'a> {
     pub bind_private_fields: bool,
     pub proxy: bool,
     pub doc_pattern: Option<&'a DocConfig>,
+}
+
+#[derive(Debug)]
+pub struct TempClassConfig {
+    pub bind: Option<bool>,
+    pub bind_private_classes: Option<bool>,
+    pub bind_private_methods: Option<bool>,
+    pub bind_private_fields: Option<bool>,
+    pub proxy: Option<bool>,
 }
 
 fn resolve_file(path: &Path, dir: &Path) -> io::Result<PathBuf> {
