@@ -23,7 +23,7 @@ This project started out as a fork of [`java-spaghetti`](https://github.com/Dirb
 The list of differences from `java-spaghetti` are:
 
 - Configuration using TOML instead of YAML, to better fit in with the rest of the rust ecosystem.
-- Generated code uses absolute paths (`crate::...`) instead of relative paths (`super::...`), because relative path chains in a multifile/crate layout get huge FAST.
+- Generated code uses absolute paths (`crate::...`) instead of relative paths (`super::...`), because relative path chains can be confusing to read.
 - Code is generated as multiple files following the package layout of the source JARs.
 - Generated code does use macros, cause it's easier to read that way (at least to me).
 - EVEN MORE modernized rust and updated dependencies. `java-spaghetti` is quite stale, and also slightly broken on newer rust versions.
@@ -34,11 +34,11 @@ A list of differences from `jni-bindgen` are listed in [`java-spaghetti`'s READM
 
 - [X] Switch back to a `.toml` configuration format
 - [X] Allow Glob Paths as inputs
-- [ ] Use `ristretto_classfile` instead of `cafebabe`
 - [ ] Fix code gen issues
-  - [ ] Use absolute paths (`crate::...`)
+  - [X] Use absolute paths (`crate::...`)
   - [ ] "Correctly" format generated code
   - [ ] Use SOME macros to improve readability
+- [ ] Use `ristretto_classfile` instead of `cafebabe`
 - [ ] Implement stub generation
 - [ ] Actually do documentation
 

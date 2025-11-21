@@ -10,7 +10,7 @@ mod modules;
 
 use self::{classes::Class, modules::Module};
 use crate::{config, io_data_err, parser_util};
-use proc_macro2::{Literal, TokenStream};
+use proc_macro2::{Literal, Ident, TokenStream};
 use quote::{TokenStreamExt, format_ident, quote};
 use std::{collections::HashMap, ffi::CString, io, rc::Rc, str::FromStr};
 
@@ -37,64 +37,83 @@ impl<'a> Context<'a> {
     pub fn java_to_rust_path(
         &self,
         java_class: parser_util::Id,
-        mod_: &str,
+        curr_mod: &str,
     ) -> Result<TokenStream, anyhow::Error> {
-        let m: String = Class::mod_for(java_class)?;
-        let s: String = Class::name_for(java_class)?;
-        let fqn: String = format!("{m}::{s}");
+        let jclass_mod: String = Class::mod_for(java_class)?;
+        let jclass_name: String = Class::name_for(java_class)?;
+        let jclass_path: String = format!("{jclass_mod}::{jclass_name}");
 
-        // Calculate relative path from B to A.
-        let b: Vec<&str> = mod_.split("::").collect();
-        let a: Vec<&str> = fqn.split("::").collect();
+        // // Calculate relative path from B to A.
+        // let curr_mod_comps: Vec<&str> = curr_mod.split("::").collect();
+        // let jclass_path_comps: Vec<&str> = jclass_path.split("::").collect();
+        // let mut jclass_unique_path: &[&str] = &jclass_path_comps[..jclass_path_comps.len() - 1];
+        // let mut curr_mod_unique_path: &[&str] = &curr_mod_comps[..];
+        // while !jclass_unique_path.is_empty()
+        //     && !curr_mod_unique_path.is_empty()
+        //     && jclass_unique_path[0] == curr_mod_unique_path[0]
+        // {
+        //     jclass_unique_path = &jclass_unique_path[1..];
+        //     curr_mod_unique_path = &curr_mod_unique_path[1..];
+        // }
 
-        let mut ma: &[&str] = &a[..a.len() - 1];
-        let mut mb: &[&str] = &b[..];
-        while !ma.is_empty() && !mb.is_empty() && ma[0] == mb[0] {
-            ma = &ma[1..];
-            mb = &mb[1..];
+        // let mut result: TokenStream = TokenStream::new();
+
+        // // for each item left in B, append a `super`
+        // for _ in curr_mod_unique_path {
+        //     result.extend(quote!(super::));
+        // }
+
+        // // for each item in A, append it
+        // for ident in jclass_unique_path {
+        //     let ident: Ident = format_ident!("{}", ident);
+        //     result.extend(quote!(#ident::));
+        // }
+
+        // let ident: Ident =
+        //     format_ident!("{}", jclass_path_comps[jclass_path_comps.len() - 1]);
+        // result.append(ident);
+
+
+        let mut result: TokenStream = TokenStream::new();
+
+        if jclass_mod == curr_mod {
+            result.append(format_ident!("{}", jclass_name));
+        } else {
+            result.extend(quote!(crate::));
+
+            for ident in jclass_mod.split("::") {
+                let ident: Ident = format_ident!("{}", ident);
+                result.extend(quote!(#ident::));
+            }
+
+            result.append(format_ident!("{}", jclass_name));
         }
 
-        let mut res: TokenStream = TokenStream::new();
-
-        // for each item left in b, append a `super`
-        for _ in mb {
-            res.extend(quote!(super::));
-        }
-
-        // for each item in a, append it
-        for ident in ma {
-            let ident: proc_macro2::Ident = format_ident!("{}", ident);
-            res.extend(quote!(#ident::));
-        }
-
-        let ident: proc_macro2::Ident = format_ident!("{}", a[a.len() - 1]);
-        res.append(ident);
-
-        Ok(res)
+        Ok(result)
     }
 
     pub fn add_class(&mut self, class: parser_util::JavaClass) -> Result<(), anyhow::Error> {
-        let cc: config::ClassConfig<'_> = self.config.resolve_class(class.path().as_str());
-        if !cc.bind {
+        let class_config: config::ClassConfig<'_> = self.config.resolve_class(class.path().as_str());
+        if !class_config.bind {
             return Ok(());
         }
 
         let java_path: String = class.path().as_str().to_string();
-        let s: Rc<Class> = Rc::new(Class::new(class)?);
+        let class: Rc<Class> = Rc::new(Class::new(class)?);
 
-        self.all_classes.insert(java_path, s.clone());
+        self.all_classes.insert(java_path, class.clone());
 
         let mut rust_mod: &mut Module = &mut self.module;
-        for fragment in s.rust.mod_.split("::") {
+        for fragment in class.rust.mod_.split("::") {
             rust_mod = rust_mod.modules.entry(fragment.to_owned()).or_default();
         }
-        if rust_mod.classes.contains_key(&s.rust.struct_name) {
+        if rust_mod.classes.contains_key(&class.rust.struct_name) {
             return io_data_err!(
                 "Unable to add_class(): java class name {:?} was already added",
-                &s.rust.struct_name
+                &class.rust.struct_name
             )?;
         }
-        rust_mod.classes.insert(s.rust.struct_name.clone(), s);
+        rust_mod.classes.insert(class.rust.struct_name.clone(), class);
 
         Ok(())
     }
