@@ -80,7 +80,7 @@ fn gather_file(context: &mut emit::Context, path: &Path) -> Result<(), anyhow::E
                 ZipArchive::new(BufReader::new(File::open(path)?))?;
             let mut classfiles: Vec<String> = Vec::new();
             for file in jar.file_names() {
-                if !file.ends_with(".class") {
+                if !file.ends_with(".class") || file.ends_with("package-info.class") {
                     continue;
                 }
                 classfiles.push(file.to_owned());
@@ -95,7 +95,7 @@ fn gather_file(context: &mut emit::Context, path: &Path) -> Result<(), anyhow::E
                 let mut file: ZipFile<'_, BufReader<File>> = jar.by_name(file)?;
                 // trace!(
                 //     "    Reading {:width$}/{}: {:?}...",
-                //     i + 1,
+                //     _i + 1,
                 //     num_files,
                 //     pretty_path!(file.enclosed_name().unwrap()),
                 //     width = num_files.checked_ilog10().unwrap_or(0) as usize + 1

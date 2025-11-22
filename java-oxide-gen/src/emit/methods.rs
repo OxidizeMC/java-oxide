@@ -50,23 +50,23 @@ impl<'a> Method<'a> {
         cc: &ClassConfig,
         mod_: &str,
     ) -> anyhow::Result<TokenStream> {
-        let mut emit_reject_reasons: Vec<&str> = Vec::new();
+        let mut emit_reject_reasons: Vec<String> = Vec::new();
 
         let descriptor: &MethodDescriptor<'_> = self.java.descriptor();
 
         let method_name: String = if let Some(name) = self.rust_name() {
             name.to_owned()
         } else {
-            emit_reject_reasons.push("ERROR:  Failed to mangle method name");
+            emit_reject_reasons.push("ERROR: Failed to mangle method name".to_string());
             self.java.name().to_owned()
         };
 
         if self.java.is_bridge() {
-            emit_reject_reasons.push("Bridge method - type erasure");
+            emit_reject_reasons.push("Bridge method - type erasure".to_string());
         }
         if self.java.is_static_init() {
             emit_reject_reasons
-                .push("Static class constructor - never needs to be called by Rust.");
+                .push("Static class constructor - never needs to be called by Rust.".to_string());
         }
 
         // Parameter names may or may not be available as extra debug information.  Example:
@@ -120,13 +120,12 @@ impl<'a> Method<'a> {
                 ret_method_fragment = "object";
                 ret_decl = quote!(::java_oxide::Local<'env, Self>);
             } else {
-                emit_reject_reasons.push("ERROR:  Constructor should've returned void");
+                emit_reject_reasons.push("ERROR: Constructor should've returned void".to_string());
             }
         }
 
         if !emit_reject_reasons.is_empty() {
-            // TODO log
-            return Ok(TokenStream::new());
+            return Err(anyhow::anyhow!(emit_reject_reasons.join("\n")));
         }
 
         let mut out: TokenStream = TokenStream::new();

@@ -21,14 +21,7 @@ constructor-url = "https://maven.fabricmc.net/docs/fabric-api-0.138.3+1.21.10/{C
 [[include]]
 match = [
     "net.fabricmc.fabric.api.**",
-    "java.util.Collection",
-    # "java.util.function.Consumer",
-    # "java.util.function.BiConsumer",
-    "java.lang.String",
-    # "java.lang.Class",
-    "java.lang.Throwable",
-    "java.lang.StackTraceElement",
-    "java.lang.Object",
+    # "java.**",
 ]
 bind = true
 

@@ -41,7 +41,6 @@ impl<'a> Context<'a> {
     ) -> Result<TokenStream, anyhow::Error> {
         let jclass_mod: String = Class::mod_for(java_class)?;
         let jclass_name: String = Class::name_for(java_class)?;
-        let jclass_path: String = format!("{jclass_mod}::{jclass_name}");
         let mut result: TokenStream = TokenStream::new();
 
         if jclass_mod == curr_mod {

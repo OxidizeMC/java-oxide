@@ -15,7 +15,7 @@ impl Class {
         context: &Context,
         methods: &[Method],
     ) -> anyhow::Result<TokenStream> {
-        let mut emit_reject_reasons: Vec<&'static str> = Vec::new();
+        let mut emit_reject_reasons: Vec<String> = Vec::new();
 
         let mut out: TokenStream = TokenStream::new();
         let mut contents: TokenStream = TokenStream::new();

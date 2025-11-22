@@ -34,7 +34,7 @@ impl<'a> Field<'a> {
         cc: &ClassConfig,
         mod_: &str,
     ) -> anyhow::Result<TokenStream> {
-        let mut emit_reject_reasons: Vec<&'static str> = Vec::new();
+        let mut emit_reject_reasons: Vec<String> = Vec::new();
 
         let descriptor: &&FieldDescriptor<'_> = &self.java.descriptor();
 
@@ -61,16 +61,16 @@ impl<'a> Field<'a> {
 
         if self.rust_names.is_err() {
             emit_reject_reasons.push(match self.java.name() {
-                "$VALUES" => "Failed to mangle field name: enum $VALUES", // Expected
+                "$VALUES" => "Failed to mangle field name: enum $VALUES".to_string(), // Expected
                 s if s.starts_with("this$") => {
-                    "Failed to mangle field name: this$N outer class pointer"
+                    "Failed to mangle field name: this$N outer class pointer".to_string()
                 } // Expected
-                _ => "ERROR:  Failed to mangle field name(s)",
+                _ => "ERROR: Failed to mangle field name(s)".to_string(),
             });
         }
 
         if !emit_reject_reasons.is_empty() {
-            return Ok(TokenStream::new());
+            return Err(anyhow::anyhow!(emit_reject_reasons.join("\n")));
         }
 
         let keywords: String = format!(
@@ -276,7 +276,7 @@ pub fn emit_type(
     context: &Context<'_>,
     mod_: &str,
     flavor: RustTypeFlavor,
-    reject_reasons: &mut Vec<&'static str>,
+    reject_reasons: &mut Vec<String>,
 ) -> Result<TokenStream, std::fmt::Error> {
     let res: TokenStream = if descriptor.dimensions == 0 {
         match &descriptor.field_type {
@@ -291,15 +291,21 @@ pub fn emit_type(
             FieldType::Object(class_name) => {
                 let class: Id<'_> = Id::from(class_name);
                 if !context.all_classes.contains_key(class.as_str()) {
-                    reject_reasons.push("ERROR:  missing class for field/argument type");
+                    reject_reasons.push(format!(
+                        "ERROR: missing class for field/argument type: {:?}",
+                        class.as_str()
+                    ));
                 }
-                if let Ok(path) = context.java_to_rust_path(class, mod_) {
-                    flavorify(path, flavor)
-                } else {
-                    reject_reasons
-                        .push("ERROR:  Failed to resolve JNI path to Rust path for class type");
-                    let class: &str = class.as_str();
-                    quote!(#class)
+                match context.java_to_rust_path(class, mod_) {
+                    Ok(path) => flavorify(path, flavor),
+                    Err(e) => {
+                        reject_reasons.push(format!(
+                            "ERROR: Failed to resolve JNI path to Rust path for class type: {}",
+                            e
+                        ));
+                        let class: &str = class.as_str();
+                        quote!(#class)
+                    }
                 }
             }
         }
@@ -319,15 +325,20 @@ pub fn emit_type(
                 let class: Id<'_> = Id::from(class_name);
 
                 if !context.all_classes.contains_key(class.as_str()) {
-                    reject_reasons.push("ERROR:  missing class for field type");
+                    reject_reasons.push(format!(
+                        "ERROR: missing class for field type: {:?}",
+                        class.as_str()
+                    ));
                 }
 
                 let path: TokenStream = match context.java_to_rust_path(class, mod_) {
                     Ok(path) => path,
-                    Err(_) => {
-                        reject_reasons
-                            .push("ERROR:  Failed to resolve JNI path to Rust path for class type");
-                        quote!(???)
+                    Err(e) => {
+                        reject_reasons.push(format!(
+                            "ERROR: Failed to resolve JNI path to Rust path for class type: {}",
+                            e
+                        ));
+                        quote!(???) // FIXME: This is bad? Either return early or fill with something less bad?
                     }
                 };
 

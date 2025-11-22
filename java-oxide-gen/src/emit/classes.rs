@@ -4,6 +4,7 @@ use crate::{
     emit::Context,
     identifiers::{FieldMangling, MethodManglingStyle, rust_ident},
     parser_util::{Id, IdPart, JavaClass},
+    prelude::*,
 };
 use cafebabe::{FieldInfo, MethodInfo, descriptors::ClassName};
 use proc_macro2::{Ident, Literal, TokenStream};
@@ -189,13 +190,27 @@ impl Class {
         self.resolve_collisions(&mut methods, &fields)?;
 
         for method in &mut methods {
-            let res: TokenStream = method.emit(context, &cc, &self.rust.mod_).unwrap();
-            contents.extend(res);
+            match method.emit(context, &cc, &self.rust.mod_) {
+                Ok(res) => contents.extend(res),
+                Err(e) => trace!(
+                    "METHOD REJECTED - \"{}.{}()\":\n{}",
+                    self.java.path().as_str(),
+                    method.java.name(),
+                    e
+                ),
+            };
         }
 
         for field in &mut fields {
-            let res: TokenStream = field.emit(context, &cc, &self.rust.mod_).unwrap();
-            contents.extend(res);
+            match field.emit(context, &cc, &self.rust.mod_) {
+                Ok(res) => contents.extend(res),
+                Err(e) => trace!(
+                    "FIELD REJECTED - \"{}.{}\":\n{}",
+                    self.java.path().as_str(),
+                    field.java.name(),
+                    e
+                ),
+            };
         }
 
         out.extend(quote!(impl #rust_name { #contents }));
