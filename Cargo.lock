@@ -745,14 +745,14 @@ checksum = "4a5f13b858c8d314ee3e8f639011f7ccefe71f97f96e50151fb991f267928e2c"
 
 [[package]]
 name = "java-oxide"
-version = "0.1.0-dev.1"
+version = "0.1.0"
 dependencies = [
  "jni-sys",
 ]
 
 [[package]]
 name = "java-oxide-gen"
-version = "0.1.0-dev.1"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "bitflags 2.10.0",
@@ -1032,6 +1032,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d558c559f0450f16f2a27a1f017ef38468c1090c9ce63c8e51366232d53717b4"
 
 [[package]]
+name = "proc-canonicalize"
+version = "0.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fee1b40b4be6a6dc63c47b9267cfa07172b9c0f614860a6267bfe16e7eb2f490"
+
+[[package]]
 name = "proc-macro2"
 version = "1.0.103"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1209,9 +1215,12 @@ checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
 
 [[package]]
 name = "soft-canonicalize"
-version = "0.4.5"
+version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8d773c1dc6044d8c2065e16808d6aed9d840c172a8b6c3295658be1138b3b53b"
+checksum = "4469414448aa3b9b5b523f7e59f6766bf5c096cf5851a4b04726127a92407489"
+dependencies = [
+ "proc-canonicalize",
+]
 
 [[package]]
 name = "stable_deref_trait"

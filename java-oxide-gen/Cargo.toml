@@ -1,9 +1,9 @@
 [package]
 name = "java-oxide-gen"
-version = "0.1.0-dev.1"
+description = "Code generator for binding to JVM APIs from Rust"
+version = "0.1.0"
 edition = "2024"
 authors = ["PitchBlackNights <pitchblacknights@proton.me>"]
-description = "Code generator for binding to JVM APIs from Rust"
 repository = "https://github.com/OxidizeMC/java-oxide"
 keywords = ["jvm", "jni", "bindgen"]
 categories = ["development-tools::ffi"]
@@ -25,7 +25,7 @@ env_logger = "0.11.8"
 log = "0.4.28"
 colored = "3.0.0"
 chrono = "0.4.42"
-soft-canonicalize = "0.4.5"
+soft-canonicalize = "0.5.2"
 # const_format = { version = "0.2.35", features = ["fmt"] }
 
 [dev-dependencies]

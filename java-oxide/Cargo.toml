@@ -1,15 +1,15 @@
 [package]
 name = "java-oxide"
-version = "0.1.0-dev.1"
+description = "Glue code to accompany the java-oxide code generator for binding to JVM APIs from Rust"
+version = "0.1.0"
 edition = "2024"
 authors = ["PitchBlackNights <pitchblacknights@proton.me>"]
-description = "Glue code to accompany the java-oxide code generator for binding to JVM APIs from Rust"
-documentation = "https://docs.rs/java-oxide/"
 repository = "https://github.com/OxidizeMC/java-oxide"
+documentation = "https://docs.rs/java-oxide/"
 keywords = ["jvm", "jni", "bindgen"]
 categories = ["external-ffi-bindings"]
 license = "MIT"
 readme = "../README.md"
 
 [dependencies]
-jni-sys = "0.4.0"
+jni-sys = "0.4"
