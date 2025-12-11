@@ -1,8 +1,0 @@
-[package]
-name = "gen-test"
-edition = "2024"
-
-[dependencies]
-java-oxide = { path = "../java-oxide" }
-
-[workspace]

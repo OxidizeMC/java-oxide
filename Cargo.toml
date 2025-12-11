@@ -1,4 +1,15 @@
-[workspace]
-resolver = "3"
-members = ["java-oxide", "java-oxide-gen"]
-exclude = ["gen-test"]
+[package]
+name = "java-oxide"
+description = "Glue code to accompany `java-oxide-gen` for binding to JVM APIs from Rust"
+version = "0.1.0"
+edition = "2024"
+authors = ["PitchBlackNights <pitchblacknights@proton.me>"]
+repository = "https://github.com/OxidizeMC/java-oxide"
+documentation = "https://docs.rs/java-oxide"
+keywords = ["jvm", "jni", "bindgen"]
+categories = ["external-ffi-bindings"]
+license = "MIT"
+readme = "README.md"
+
+[dependencies]
+jni-sys = "0.4"
